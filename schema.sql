@@ -175,7 +175,26 @@ create policy "Only project participants can send messages"
   );
 
 -- 5. Enable realtime on the tables the dashboard subscribes to
--- (safe to re-run; ignore the "already a member" error if it appears)
-alter publication supabase_realtime add table public.projects;
-alter publication supabase_realtime add table public.event_log;
-alter publication supabase_realtime add table public.messages;
+do $$
+begin
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'projects'
+  ) then
+    alter publication supabase_realtime add table public.projects;
+  end if;
+
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'event_log'
+  ) then
+    alter publication supabase_realtime add table public.event_log;
+  end if;
+
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'messages'
+  ) then
+    alter publication supabase_realtime add table public.messages;
+  end if;
+end $$;
