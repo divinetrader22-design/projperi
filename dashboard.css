@@ -126,13 +126,11 @@
 .checkpoint.reached .checkpoint-body b{ color:var(--text); }
 .checkpoint-body span{ font-family:'JetBrains Mono', monospace; font-size:10.5px; color:var(--muted-dim); }
 
-.health-list{ display:flex; flex-direction:column; gap:14px; margin-top:6px; }
-.health-row{ display:flex; flex-direction:column; gap:6px; }
-.health-top{ display:flex; justify-content:space-between; font-size:11.5px; }
-.health-top span:first-child{ color:var(--muted); font-family:'Inter'; }
-.health-top span:last-child{ font-family:'JetBrains Mono', monospace; color:var(--text); }
-.health-bar{ height:6px; border-radius:4px; background:var(--void); border:1px solid var(--line); overflow:hidden; }
-.health-fill{ height:100%; background:var(--grad); border-radius:4px; transition:width .5s ease; }
+.arcade-canvas{
+  width:100%; height:150px; border-radius:8px; margin-top:6px;
+  background:radial-gradient(ellipse at center, rgba(123,92,250,.08), rgba(6,10,20,.4));
+  border:1px solid var(--line-soft);
+}
 
 .right-col{ display:flex; flex-direction:column; gap:20px; }
 

@@ -8,12 +8,16 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-config.js"></script>
+<script src="particles.js"></script>
 </head>
 <body>
 
 <div class="grid-bg"></div>
 <div class="glow-orb a"></div>
 <div class="glow-orb b"></div>
+<div class="glow-orb c"></div>
 <div class="scanline"></div>
 
 <section class="login-page">
@@ -45,23 +49,19 @@
   <div class="login-right">
     <div class="login-card">
       <h2>Sign in to Provada</h2>
-      <p class="hint">Select your access tier to continue.</p>
+      <p class="hint">Access is by invitation only — use the credentials provided to you.</p>
 
-      <div class="role-toggle">
-        <button type="button" class="active" data-role="client" onclick="selectRole('client')">Client</button>
-        <button type="button" data-role="admin" onclick="selectRole('admin')">Admin</button>
-      </div>
-
-      <form id="loginForm" onsubmit="return handleLogin(event)">
+      <form id="loginForm" onsubmit="return handleSubmit(event)">
         <div class="field">
           <label>Email</label>
-          <input type="email" placeholder="you@company.com" required>
+          <input type="email" id="email" placeholder="you@company.com" required>
         </div>
         <div class="field">
           <label>Password</label>
-          <input type="password" placeholder="••••••••••" required>
+          <input type="password" id="password" placeholder="••••••••••" required minlength="6">
         </div>
-        <button type="submit" class="enter-btn" id="enterBtn">Enter as Client</button>
+        <p id="formMessage" style="min-height:1.2em;font-size:0.85rem;"></p>
+        <button type="submit" class="enter-btn" id="enterBtn">Sign in</button>
       </form>
       <p class="login-note">PROVADA © PAZOVADO — DESIGN PREVIEW</p>
     </div>
@@ -69,23 +69,36 @@
 </section>
 
 <script>
-  let currentRole = 'client';
-
-  function selectRole(role){
-    currentRole = role;
-    document.querySelectorAll('.role-toggle button').forEach(b=>{
-      b.classList.toggle('active', b.dataset.role === role);
-    });
-    document.getElementById('enterBtn').textContent = role === 'admin' ? 'Enter as Admin' : 'Enter as Client';
+  function showMessage(text, isError){
+    const el = document.getElementById('formMessage');
+    el.textContent = text;
+    el.style.color = isError ? '#ff6b6b' : '#37e8ff';
   }
 
-  function handleLogin(e){
+  async function handleSubmit(e){
     e.preventDefault();
-    // In the real build this is where credentials get checked against the backend.
-    // For now, the selected role is passed straight through to the dashboard.
-    window.location.href = 'dashboard.html?role=' + currentRole;
-    return false;
+    const email = document.getElementById('email').value.trim();
+    const password = document.getElementById('password').value;
+    const btn = document.getElementById('enterBtn');
+    btn.disabled = true;
+    showMessage('', false);
+
+    try {
+      const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
+      if (error) throw error;
+      window.location.href = 'dashboard.html';
+    } catch (err) {
+      showMessage(err.message || 'Something went wrong. Please try again.', true);
+    } finally {
+      btn.disabled = false;
+    }
   }
+
+  // If already signed in, skip straight to the dashboard.
+  (async () => {
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    if (session) window.location.href = 'dashboard.html';
+  })();
 </script>
 
 </body>

@@ -9,12 +9,18 @@
 <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 <link rel="stylesheet" href="dashboard.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="env-config.js"></script>
+<script src="supabase-config.js"></script>
+<script src="particles.js"></script>
+<script src="arcade.js"></script>
 </head>
 <body>
 
 <div class="grid-bg"></div>
 <div class="glow-orb a"></div>
 <div class="glow-orb b"></div>
+<div class="glow-orb c"></div>
 <div class="scanline"></div>
 
 <div class="topbar">
@@ -37,7 +43,7 @@
   </a>
   <div class="topbar-right">
     <span class="role-badge" id="roleBadge">CLIENT ACCESS</span>
-    <a class="logout-btn" href="index.html">Log out</a>
+    <a class="logout-btn" id="logoutBtn" href="index.html">Log out</a>
   </div>
 </div>
 
@@ -47,11 +53,11 @@
   <div class="ticker">
     <div class="ticker-item">
       <div class="ticker-label">Project ref</div>
-      <div class="ticker-value">PZ-0142</div>
+      <div class="ticker-value" id="tickerRef">—</div>
     </div>
     <div class="ticker-item">
       <div class="ticker-label">Client</div>
-      <div class="ticker-value">Aurora Retail Co.</div>
+      <div class="ticker-value" id="tickerClient">—</div>
     </div>
     <div class="ticker-item">
       <div class="ticker-label">Owner</div>
@@ -59,7 +65,7 @@
     </div>
     <div class="ticker-item">
       <div class="ticker-label">Est. completion</div>
-      <div class="ticker-value">2026-09-05</div>
+      <div class="ticker-value" id="tickerEta">—</div>
     </div>
     <div class="ticker-item">
       <div class="ticker-label">Link status</div>
@@ -82,7 +88,7 @@
     <!-- CENTER: hero gauge -->
     <div class="panel hero-panel">
       <span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span>
-      <div class="hero-eyebrow"><span class="dot"></span>Live project · #PZ-0142</div>
+      <div class="hero-eyebrow"><span class="dot"></span>Live project · #<span id="heroRef">PZ-0142</span></div>
 
       <div class="gauge-wrap">
         <div class="ring-spin"></div>
@@ -128,10 +134,10 @@
       <div class="panel">
         <span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span>
         <div class="panel-head">
-          <span class="panel-title">System Health</span>
-          <span class="panel-led"><span class="dot"></span>Nominal</span>
+          <span class="panel-title">Live Feed</span>
+          <span class="panel-led"><span class="dot"></span>Ambient</span>
         </div>
-        <div class="health-list" id="healthList"></div>
+        <canvas id="arcadeCanvas" width="246" height="150" class="arcade-canvas"></canvas>
       </div>
     </div>
   </div>
@@ -168,11 +174,7 @@
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
     </button>
   </div>
-  <div class="chat-body" id="chatBody">
-    <div class="msg them">Hi! Welcome to your Provada dashboard. Let us know if anything comes up.<div class="msg-time">09:14</div></div>
-    <div class="msg me">Thanks — just checking on the current stage.<div class="msg-time">09:15</div></div>
-    <div class="msg them">You're in Verifying. Next checkpoint update lands within 48h.<div class="msg-time">09:16</div></div>
-  </div>
+  <div class="chat-body" id="chatBody"></div>
   <div class="chat-input-row">
     <input type="text" id="chatInput" placeholder="Type a message…" onkeydown="if(event.key==='Enter') sendMessage()">
     <button class="chat-send" onclick="sendMessage()">
@@ -182,17 +184,9 @@
 </div>
 
 <script>
-  // ---------- role (passed in from login.html) ----------
-  const params = new URLSearchParams(window.location.search);
-  const currentRole = params.get('role') === 'admin' ? 'admin' : 'client';
-
-  document.getElementById('roleBadge').textContent = currentRole === 'admin' ? 'ADMIN ACCESS' : 'CLIENT ACCESS';
-  document.getElementById('adminControls').style.display = currentRole === 'admin' ? 'flex' : 'none';
-  document.getElementById('chatTitle').textContent = currentRole === 'admin' ? 'Aurora Retail Co.' : 'Pazovado Support';
-  document.getElementById('chatAvatar').textContent = currentRole === 'admin' ? 'AR' : 'PZ';
-
-  // ---------- progress state ----------
-  let progress = 20; // demo starting value
+  let sessionUser = null;
+  let currentRole = 'client';
+  let project = null;
 
   const stages = [
     {at:0,  label:'Initiated'},
@@ -243,33 +237,11 @@
     cpList.appendChild(el);
   });
 
-  // ---------- system health (decorative sub-metrics) ----------
-  const healthDefs = [
-    {label:'Design', weight:1.3},
-    {label:'Build', weight:1.0},
-    {label:'QA / Verification', weight:0.75},
-    {label:'Deployment', weight:0.45}
-  ];
-  const healthList = document.getElementById('healthList');
-  healthDefs.forEach(h=>{
-    const row = document.createElement('div');
-    row.className = 'health-row';
-    row.dataset.weight = h.weight;
-    row.innerHTML = `
-      <div class="health-top"><span>${h.label}</span><span class="hval">0%</span></div>
-      <div class="health-bar"><div class="health-fill" style="width:0%"></div></div>`;
-    healthList.appendChild(row);
-  });
+  // ---------- ambient arcade animation (replaces old System Health panel) ----------
+  startArcadeCanvas('arcadeCanvas');
 
   // ---------- event log ----------
   const logList = document.getElementById('logList');
-  const logSeed = [
-    {t:'09:02', txt:'Project PZ-0142 initiated by Pazovado Team.'},
-    {t:'09:14', txt:'Client account linked to live dashboard.'},
-    {t:'11:40', txt:'Intake assets received and queued for review.'},
-    {t:'14:05', txt:'Checkpoint advanced — now Reviewing.'},
-  ];
-  logSeed.forEach(l => addLog(l.txt, l.t, true));
 
   function addLog(text, time, hit){
     const item = document.createElement('div');
@@ -278,7 +250,12 @@
     logList.prepend(item);
   }
 
-  function render(){
+  function fmtTime(iso){
+    const d = iso ? new Date(iso) : new Date();
+    return d.getHours().toString().padStart(2,'0') + ':' + d.getMinutes().toString().padStart(2,'0');
+  }
+
+  function render(progress){
     // ticks
     document.querySelectorAll('.tick').forEach(t=>{
       const th = parseInt(t.dataset.threshold);
@@ -295,14 +272,6 @@
       c.classList.toggle('reached', progress >= parseInt(c.dataset.at));
     });
 
-    // health bars (decorative, scaled off overall progress)
-    document.querySelectorAll('.health-row').forEach(row=>{
-      const w = parseFloat(row.dataset.weight);
-      const val = Math.max(0, Math.min(100, Math.round(progress * w)));
-      row.querySelector('.health-fill').style.width = val + '%';
-      row.querySelector('.hval').textContent = val + '%';
-    });
-
     const stage = currentStage(progress);
     document.getElementById('percentText').textContent = String(progress).padStart(2,'0') + '%';
     document.getElementById('stepText').textContent = `STEP ${progress/5} / 20`;
@@ -310,18 +279,25 @@
     document.getElementById('stageDetail').textContent = stage.label;
   }
 
-  function setProgress(v){
+  async function setProgress(v){
+    if (!project || currentRole !== 'admin') return;
     const next = Math.max(0, Math.min(100, Math.round(v/5)*5));
-    if(next === progress) return;
-    progress = next;
-    render();
-    const now = new Date();
-    const time = now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0');
-    addLog(`Checkpoint updated to ${progress}% — ${currentStage(progress).label}.`, time, true);
-  }
-  function stepProgress(delta){ setProgress(progress + delta); }
+    if (next === project.progress) return;
+    const stage = currentStage(next);
 
-  render();
+    const { error } = await supabaseClient
+      .from('projects')
+      .update({ progress: next, status_label: stage.label, updated_at: new Date().toISOString() })
+      .eq('id', project.id);
+    if (error) { console.error(error); return; }
+
+    await supabaseClient.from('event_log').insert({
+      project_id: project.id,
+      message: `Checkpoint updated to ${next}% — ${stage.label}.`
+    });
+    // UI updates itself via the realtime subscription below.
+  }
+  function stepProgress(delta){ if(project) setProgress(project.progress + delta); }
 
   // ---------- chat ----------
   function toggleChat(){
@@ -332,32 +308,92 @@
     }
   }
 
-  function sendMessage(){
+  function renderMessage(msg){
+    const body = document.getElementById('chatBody');
+    const mine = msg.sender_id === sessionUser.id;
+    const el = document.createElement('div');
+    el.className = 'msg ' + (mine ? 'me' : 'them');
+    el.innerHTML = String(msg.content).replace(/</g,'&lt;') + `<div class="msg-time">${fmtTime(msg.created_at)}</div>`;
+    body.appendChild(el);
+    body.scrollTop = body.scrollHeight;
+  }
+
+  async function sendMessage(){
     const input = document.getElementById('chatInput');
     const text = input.value.trim();
-    if(!text) return;
-    const body = document.getElementById('chatBody');
-    const now = new Date();
-    const time = now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0');
-
-    const mine = document.createElement('div');
-    mine.className = 'msg me';
-    mine.innerHTML = text.replace(/</g,'&lt;') + `<div class="msg-time">${time}</div>`;
-    body.appendChild(mine);
+    if(!text || !project) return;
     input.value = '';
-    body.scrollTop = body.scrollHeight;
-
-    setTimeout(()=>{
-      const reply = document.createElement('div');
-      reply.className = 'msg them';
-      const replyText = currentRole === 'admin'
-        ? "Got it — I'll take a look and update the checkpoint shortly."
-        : "Thanks for the note — we'll get back to you shortly.";
-      reply.innerHTML = replyText + `<div class="msg-time">${time}</div>`;
-      body.appendChild(reply);
-      body.scrollTop = body.scrollHeight;
-    }, 900);
+    const { error } = await supabaseClient.from('messages').insert({
+      project_id: project.id,
+      sender_id: sessionUser.id,
+      sender_role: currentRole,
+      content: text
+    });
+    if (error) console.error(error);
+    // The message appears via the realtime subscription below (for us and the other party).
   }
+
+  async function init(){
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    if (!session) { window.location.href = 'index.html'; return; }
+    sessionUser = session.user;
+
+    const { data: profile } = await supabaseClient
+      .from('profiles').select('role, full_name').eq('id', sessionUser.id).single();
+    currentRole = profile?.role === 'admin' ? 'admin' : 'client';
+
+    const cfg = window.PROVADA_CONFIG || {};
+    document.getElementById('tickerRef').textContent = cfg.projectRef || '—';
+    document.getElementById('heroRef').textContent = cfg.projectRef || 'PZ-0142';
+    document.getElementById('tickerClient').textContent = cfg.clientName || '—';
+    document.getElementById('tickerEta').textContent = cfg.estCompletion || '—';
+
+    document.getElementById('roleBadge').textContent = currentRole === 'admin' ? 'ADMIN ACCESS' : 'CLIENT ACCESS';
+    document.getElementById('adminControls').style.display = currentRole === 'admin' ? 'flex' : 'none';
+    document.getElementById('chatTitle').textContent = currentRole === 'admin' ? (cfg.clientName || 'Client') : 'Pazovado Support';
+    document.getElementById('chatAvatar').textContent = currentRole === 'admin' ? 'CL' : 'PZ';
+
+    const { data: projects } = await supabaseClient.from('projects').select('*').limit(1);
+    project = projects && projects[0];
+    if (!project) {
+      document.querySelector('.deck').innerHTML =
+        '<div class="panel" style="text-align:center;padding:40px;">' +
+        '<p style="color:var(--muted);">No project is linked to your account yet. Please contact your Pazovado admin.</p>' +
+        '</div>';
+      return;
+    }
+
+    render(project.progress);
+
+    const { data: events } = await supabaseClient
+      .from('event_log').select('*').eq('project_id', project.id)
+      .order('created_at', { ascending: true }).limit(50);
+    (events || []).forEach(e => addLog(e.message, fmtTime(e.created_at), true));
+
+    const { data: messages } = await supabaseClient
+      .from('messages').select('*').eq('project_id', project.id)
+      .order('created_at', { ascending: true }).limit(100);
+    (messages || []).forEach(renderMessage);
+
+    // ---------- realtime: progress + event log + chat, all live ----------
+    supabaseClient
+      .channel('project-' + project.id)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'projects', filter: `id=eq.${project.id}` },
+        payload => { project = payload.new; render(project.progress); })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'event_log', filter: `project_id=eq.${project.id}` },
+        payload => addLog(payload.new.message, fmtTime(payload.new.created_at), true))
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `project_id=eq.${project.id}` },
+        payload => renderMessage(payload.new))
+      .subscribe();
+  }
+
+  document.getElementById('logoutBtn').addEventListener('click', async (e) => {
+    e.preventDefault();
+    await supabaseClient.auth.signOut();
+    window.location.href = 'index.html';
+  });
+
+  init();
 </script>
 
 </body>

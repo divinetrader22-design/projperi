@@ -45,9 +45,16 @@ body{
 .glow-orb{
   position:fixed; z-index:0; pointer-events:none; border-radius:50%;
   filter: blur(120px); opacity:.35;
+  animation: orbit 26s ease-in-out infinite alternate;
 }
 .glow-orb.a{ width:520px; height:520px; top:-180px; left:-120px; background:var(--violet); }
-.glow-orb.b{ width:480px; height:480px; bottom:-200px; right:-140px; background:var(--cyan); opacity:.22;}
+.glow-orb.b{ width:480px; height:480px; bottom:-200px; right:-140px; background:var(--cyan); opacity:.22; animation-duration:32s; animation-direction:alternate-reverse; }
+.glow-orb.c{ width:360px; height:360px; top:40%; left:60%; background:var(--green); opacity:.14; animation-duration:38s; }
+@keyframes orbit{
+  0%{ transform:translate(0,0) scale(1); }
+  50%{ transform:translate(40px,-30px) scale(1.08); }
+  100%{ transform:translate(-30px,20px) scale(0.96); }
+}
 
 .scanline{
   position:fixed; inset:0; z-index:1; pointer-events:none;
@@ -105,8 +112,9 @@ body{
     radial-gradient(circle at 80% 75%, rgba(55,232,255,.13), transparent 45%);
   pointer-events:none;
 }
-.login-mark{ position:relative; z-index:2; margin-bottom:34px; opacity:0; animation: rise .7s ease forwards; }
+.login-mark{ position:relative; z-index:2; margin-bottom:34px; opacity:0; animation: rise .7s ease forwards, float 5s ease-in-out 1s infinite; }
 .login-mark svg{ width:64px; height:64px; }
+@keyframes float{ 0%,100%{ transform:translateY(0); } 50%{ transform:translateY(-8px); } }
 .login-headline{
   position:relative; z-index:2;
   font-family:'Chakra Petch', sans-serif; font-weight:600;
@@ -150,17 +158,17 @@ body{
 }
 .login-card p.hint{ color:var(--muted); font-size:13px; margin-bottom:22px; }
 
-.role-toggle{
+.role-toggle, .mode-toggle{
   display:flex; background:var(--void); border:1px solid var(--line);
   border-radius:10px; padding:4px; margin-bottom:22px;
 }
-.role-toggle button{
+.role-toggle button, .mode-toggle button{
   flex:1; background:transparent; border:none; color:var(--muted);
   font-family:'JetBrains Mono', monospace; font-size:11.5px; letter-spacing:.06em;
   padding:9px 0; border-radius:7px; cursor:pointer; text-transform:uppercase;
   transition:.2s;
 }
-.role-toggle button.active{
+.role-toggle button.active, .mode-toggle button.active{
   background:var(--grad); color:#0a0e18; font-weight:600;
 }
 
