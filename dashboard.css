@@ -46,6 +46,29 @@
 }
 .ticker-value .dot{ width:6px; height:6px; border-radius:50%; background:var(--green); box-shadow:0 0 6px var(--green); flex-shrink:0; }
 
+/* ---------- recovery tracker ---------- */
+.recovery-panel{ margin-bottom:22px; }
+.recovery-stats{
+  display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-top:6px;
+}
+.recovery-stat{
+  padding:16px 18px; border:1px solid var(--line); border-radius:10px;
+  background:linear-gradient(180deg, rgba(255,255,255,.02), transparent);
+}
+.recovery-label{
+  font-family:'JetBrains Mono', monospace; font-size:10px; letter-spacing:.1em;
+  text-transform:uppercase; color:var(--muted-dim); margin-bottom:8px;
+}
+.recovery-value{
+  font-family:'Orbitron', sans-serif; font-size:26px; font-weight:700; letter-spacing:.01em;
+}
+.recovery-value.amber{ color:var(--amber); text-shadow:0 0 16px rgba(255,184,77,.3); }
+.recovery-value.cyan{ color:var(--cyan); text-shadow:0 0 16px rgba(55,232,255,.3); }
+
+@media (max-width:700px){
+  .recovery-stats{ grid-template-columns:1fr; }
+}
+
 /* ---------- main 3-column deck ---------- */
 .deck-grid{ display:grid; grid-template-columns:290px 1fr 290px; gap:20px; align-items:start; }
 

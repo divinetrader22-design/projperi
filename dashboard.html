@@ -74,6 +74,25 @@
     </div>
   </div>
 
+  <!-- Recovery tracker -->
+  <div class="panel recovery-panel">
+    <span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span>
+    <div class="panel-head">
+      <span class="panel-title">Recovery Tracker</span>
+      <span class="panel-led"><span class="dot"></span>Case data</span>
+    </div>
+    <div class="recovery-stats">
+      <div class="recovery-stat">
+        <div class="recovery-label">Vulnerable funds (Suspects)</div>
+        <div class="recovery-value amber" id="vulnerableFunds">—</div>
+      </div>
+      <div class="recovery-stat">
+        <div class="recovery-label">Target recovery</div>
+        <div class="recovery-value cyan" id="targetRecovery">—</div>
+      </div>
+    </div>
+  </div>
+
   <div class="deck-grid">
 
     <!-- LEFT: event log -->
@@ -283,6 +302,13 @@
     return d.getHours().toString().padStart(2,'0') + ':' + d.getMinutes().toString().padStart(2,'0');
   }
 
+  function fmtMoney(value){
+    if (value === undefined || value === null || value === '') return '—';
+    const n = Number(String(value).replace(/[^0-9.-]/g, ''));
+    if (Number.isNaN(n)) return String(value); // fall back to raw text if not numeric
+    return '$' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
   function render(progress){
     // ticks
     document.querySelectorAll('.tick').forEach(t=>{
@@ -422,6 +448,8 @@
     document.getElementById('tickerClient').textContent = cfg.clientName || '—';
     document.getElementById('tickerEta').textContent = cfg.estCompletion || '—';
     document.getElementById('tickerStart').textContent = cfg.startDate || '—';
+    document.getElementById('vulnerableFunds').textContent = fmtMoney(cfg.vulnerableFunds);
+    document.getElementById('targetRecovery').textContent = fmtMoney(cfg.targetRecovery);
 
     document.getElementById('roleBadge').textContent = currentRole === 'admin' ? 'ADMIN ACCESS' : 'CLIENT ACCESS';
     document.getElementById('adminControls').style.display = currentRole === 'admin' ? 'flex' : 'none';

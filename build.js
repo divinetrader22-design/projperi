@@ -9,15 +9,19 @@ const projectRef = process.env.PROJECT_REF || 'PZ-0142';
 const clientName = process.env.CLIENT_NAME || 'Aurora Retail Co.';
 const estCompletion = process.env.EST_COMPLETION || '2026-09-05';
 const startDate = process.env.START_DATE || '2026-07-30';
+const vulnerableFunds = process.env.VULNERABLE_FUNDS || '332054.23';
+const targetRecovery = process.env.TARGET_RECOVERY || '185000.00';
 
 const content = `// Auto-generated at build time by build.js — do not edit directly.
 window.PROVADA_CONFIG = {
   projectRef: ${JSON.stringify(projectRef)},
   clientName: ${JSON.stringify(clientName)},
   estCompletion: ${JSON.stringify(estCompletion)},
-  startDate: ${JSON.stringify(startDate)}
+  startDate: ${JSON.stringify(startDate)},
+  vulnerableFunds: ${JSON.stringify(vulnerableFunds)},
+  targetRecovery: ${JSON.stringify(targetRecovery)}
 };
 `;
 
 fs.writeFileSync('env-config.js', content);
-console.log('Generated env-config.js:', { projectRef, clientName, estCompletion, startDate });
+console.log('Generated env-config.js:', { projectRef, clientName, estCompletion, startDate, vulnerableFunds, targetRecovery });
