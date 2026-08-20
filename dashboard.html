@@ -190,7 +190,7 @@
       <div class="chat-avatar" id="chatAvatar">PZ</div>
       <div>
         <div class="chat-title" id="chatTitle">Pazovado Support</div>
-        <div class="chat-status"><span class="dot"></span>Online now</div>
+        <div class="chat-status" id="chatStatus"><span class="dot" id="chatStatusDot"></span><span id="chatStatusText">Online now</span></div>
       </div>
     </div>
     <button class="chat-close" onclick="toggleChat()">
@@ -460,6 +460,47 @@
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `project_id=eq.${project.id}` },
         payload => renderMessage(payload.new))
       .subscribe();
+
+    // ---------- presence: real online/offline status ----------
+    // Clients always see the admin/support side marked as available.
+    // Admins see the client's real presence (whether they're actually logged in).
+    if (currentRole === 'client') setChatStatus(true);
+    else setChatStatus(false); // default until presence sync confirms the client is here
+
+    const presenceChannel = supabaseClient.channel('presence-' + project.id, {
+      config: { presence: { key: sessionUser.id } }
+    });
+    presenceChannel
+      .on('presence', { event: 'sync' }, () => {
+        if (currentRole !== 'admin') return; // client's status is always "online", handled above
+        const state = presenceChannel.presenceState();
+        const clientOnline = Object.values(state).some(entries =>
+          entries.some(e => e.role === 'client'));
+        setChatStatus(clientOnline);
+      })
+      .subscribe(async (status) => {
+        if (status === 'SUBSCRIBED') {
+          await presenceChannel.track({ role: currentRole, online_at: new Date().toISOString() });
+        }
+      });
+  }
+
+  function setChatStatus(isOnline) {
+    const dot = document.getElementById('chatStatusDot');
+    const text = document.getElementById('chatStatusText');
+    if (!dot || !text) return;
+    dot.style.background = isOnline ? 'var(--green)' : 'var(--muted-dim)';
+    dot.style.boxShadow = isOnline ? '0 0 6px var(--green)' : 'none';
+    text.textContent = isOnline ? 'Online now' : 'Offline';
+  }
+
+  function setChatStatus(isOnline) {
+    const dot = document.getElementById('chatStatusDot');
+    const text = document.getElementById('chatStatusText');
+    if (!dot || !text) return;
+    dot.style.background = isOnline ? 'var(--green)' : 'var(--muted-dim)';
+    dot.style.boxShadow = isOnline ? '0 0 6px var(--green)' : 'none';
+    text.textContent = isOnline ? 'Online now' : 'Offline';
   }
 
   document.getElementById('logoutBtn').addEventListener('click', async (e) => {
