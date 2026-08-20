@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Provada · Mission Control</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="dashboard.css">
+</head>
+<body>
+
+<div class="grid-bg"></div>
+<div class="glow-orb a"></div>
+<div class="glow-orb b"></div>
+<div class="scanline"></div>
+
+<div class="topbar">
+  <a class="brand" href="dashboard.html">
+    <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="lg2" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stop-color="#7b5cfa"/>
+          <stop offset="1" stop-color="#37e8ff"/>
+        </linearGradient>
+      </defs>
+      <path d="M32 2 L59 16 V48 L32 62 L5 48 V16 Z" stroke="url(#lg2)" stroke-width="2.4" fill="none"/>
+      <path d="M22 20 H33.5C38 20 41.5 23.4 41.5 27.6C41.5 31.8 38 35.2 33.5 35.2H26.5V46H22V20Z" fill="url(#lg2)"/>
+      <circle cx="26.5" cy="27.6" r="1.6" fill="#060a14"/>
+    </svg>
+    <div class="brand-text">
+      <span class="brand-name">PROVADA</span>
+      <span class="brand-sub">by Pazovado</span>
+    </div>
+  </a>
+  <div class="topbar-right">
+    <span class="role-badge" id="roleBadge">CLIENT ACCESS</span>
+    <a class="logout-btn" href="index.html">Log out</a>
+  </div>
+</div>
+
+<div class="deck">
+
+  <!-- KPI ticker -->
+  <div class="ticker">
+    <div class="ticker-item">
+      <div class="ticker-label">Project ref</div>
+      <div class="ticker-value">PZ-0142</div>
+    </div>
+    <div class="ticker-item">
+      <div class="ticker-label">Client</div>
+      <div class="ticker-value">Aurora Retail Co.</div>
+    </div>
+    <div class="ticker-item">
+      <div class="ticker-label">Owner</div>
+      <div class="ticker-value">Pazovado Team</div>
+    </div>
+    <div class="ticker-item">
+      <div class="ticker-label">Est. completion</div>
+      <div class="ticker-value">2026-09-05</div>
+    </div>
+    <div class="ticker-item">
+      <div class="ticker-label">Link status</div>
+      <div class="ticker-value"><span class="dot"></span>Live</div>
+    </div>
+  </div>
+
+  <div class="deck-grid">
+
+    <!-- LEFT: event log -->
+    <div class="panel">
+      <span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span>
+      <div class="panel-head">
+        <span class="panel-title">Event Log</span>
+        <span class="panel-led"><span class="dot"></span>Streaming</span>
+      </div>
+      <div class="log-list" id="logList"></div>
+    </div>
+
+    <!-- CENTER: hero gauge -->
+    <div class="panel hero-panel">
+      <span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span>
+      <div class="hero-eyebrow"><span class="dot"></span>Live project · #PZ-0142</div>
+
+      <div class="gauge-wrap">
+        <div class="ring-spin"></div>
+        <svg viewBox="0 0 320 320" width="320" height="320">
+          <defs>
+            <linearGradient id="gaugeGrad" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" stop-color="#7b5cfa"/>
+              <stop offset="1" stop-color="#37e8ff"/>
+            </linearGradient>
+          </defs>
+          <circle class="gauge-track" cx="160" cy="160" r="130" stroke-width="14" fill="none"/>
+          <circle class="gauge-fill" id="gaugeFill" cx="160" cy="160" r="130" stroke-width="14" fill="none"
+                  stroke-linecap="round" transform="rotate(-90 160 160)"/>
+          <g id="tickGroup"></g>
+        </svg>
+        <div class="gauge-center">
+          <div class="gauge-percent" id="percentText">00%</div>
+          <div class="gauge-status" id="statusWord">Initiated</div>
+          <div class="gauge-step" id="stepText">STEP 0 / 20</div>
+        </div>
+      </div>
+      <div class="hero-scale"><span>0</span><span>25</span><span>50</span><span>75</span><span>100</span></div>
+
+      <div class="admin-controls" id="adminControls" style="display:none;">
+        <span class="actl">Admin controls</span>
+        <button class="ctrl-btn" onclick="stepProgress(-5)">− 5</button>
+        <button class="ctrl-btn primary" onclick="stepProgress(5)">+ 5</button>
+        <button class="ctrl-btn" onclick="setProgress(0)">Reset</button>
+        <button class="ctrl-btn" onclick="setProgress(100)">Mark complete</button>
+      </div>
+    </div>
+
+    <!-- RIGHT: checkpoints + system health -->
+    <div class="right-col">
+      <div class="panel">
+        <span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span>
+        <div class="panel-head">
+          <span class="panel-title">Checkpoints</span>
+        </div>
+        <div class="checkpoint-list" id="checkpointList"></div>
+      </div>
+
+      <div class="panel">
+        <span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span>
+        <div class="panel-head">
+          <span class="panel-title">System Health</span>
+          <span class="panel-led"><span class="dot"></span>Nominal</span>
+        </div>
+        <div class="health-list" id="healthList"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- session info strip -->
+  <div class="panel session-strip">
+    <span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span>
+    <div class="info-row"><span>Started</span><span>2026-07-30</span></div>
+    <div class="info-row"><span>Current checkpoint</span><span id="stageDetail">Initiated</span></div>
+    <div class="info-row"><span>Last update</span><span>Just now</span></div>
+    <div class="info-row"><span>Status</span><span style="color:var(--cyan)">On track</span></div>
+  </div>
+
+</div>
+
+<!-- ============ SUPPORT CHAT WIDGET ============ -->
+<button class="chat-launcher" id="chatLauncher" onclick="toggleChat()">
+  <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M4 5h16a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H9l-5 4V6a1 1 0 0 1 1-1Z" stroke="#0a0e18" stroke-width="1.8" stroke-linejoin="round"/>
+  </svg>
+  <span class="chat-ping">1</span>
+</button>
+
+<div class="chat-panel" id="chatPanel">
+  <div class="chat-head">
+    <div class="chat-head-left">
+      <div class="chat-avatar" id="chatAvatar">PZ</div>
+      <div>
+        <div class="chat-title" id="chatTitle">Pazovado Support</div>
+        <div class="chat-status"><span class="dot"></span>Online now</div>
+      </div>
+    </div>
+    <button class="chat-close" onclick="toggleChat()">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+    </button>
+  </div>
+  <div class="chat-body" id="chatBody">
+    <div class="msg them">Hi! Welcome to your Provada dashboard. Let us know if anything comes up.<div class="msg-time">09:14</div></div>
+    <div class="msg me">Thanks — just checking on the current stage.<div class="msg-time">09:15</div></div>
+    <div class="msg them">You're in Verifying. Next checkpoint update lands within 48h.<div class="msg-time">09:16</div></div>
+  </div>
+  <div class="chat-input-row">
+    <input type="text" id="chatInput" placeholder="Type a message…" onkeydown="if(event.key==='Enter') sendMessage()">
+    <button class="chat-send" onclick="sendMessage()">
+      <svg viewBox="0 0 24 24" fill="none"><path d="M3 11l18-8-8 18-2-8-8-2Z" stroke="#0a0e18" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/></svg>
+    </button>
+  </div>
+</div>
+
+<script>
+  // ---------- role (passed in from login.html) ----------
+  const params = new URLSearchParams(window.location.search);
+  const currentRole = params.get('role') === 'admin' ? 'admin' : 'client';
+
+  document.getElementById('roleBadge').textContent = currentRole === 'admin' ? 'ADMIN ACCESS' : 'CLIENT ACCESS';
+  document.getElementById('adminControls').style.display = currentRole === 'admin' ? 'flex' : 'none';
+  document.getElementById('chatTitle').textContent = currentRole === 'admin' ? 'Aurora Retail Co.' : 'Pazovado Support';
+  document.getElementById('chatAvatar').textContent = currentRole === 'admin' ? 'AR' : 'PZ';
+
+  // ---------- progress state ----------
+  let progress = 20; // demo starting value
+
+  const stages = [
+    {at:0,  label:'Initiated'},
+    {at:25, label:'Reviewing'},
+    {at:50, label:'Processing'},
+    {at:75, label:'Finalizing'},
+    {at:100,label:'Provada Complete'}
+  ];
+
+  function currentStage(p){
+    let s = stages[0];
+    for(const st of stages){ if(p >= st.at) s = st; }
+    return s;
+  }
+
+  // ---------- build radial ticks (20 x 5%) ----------
+  const tickGroup = document.getElementById('tickGroup');
+  const CX = 160, CY = 160, R1 = 145, R2 = 158;
+  for(let i=1;i<=20;i++){
+    const threshold = i*5;
+    const angle = (-90 + i*18) * Math.PI/180;
+    const x1 = CX + R1*Math.cos(angle), y1 = CY + R1*Math.sin(angle);
+    const x2 = CX + R2*Math.cos(angle), y2 = CY + R2*Math.sin(angle);
+    const line = document.createElementNS('http://www.w3.org/2000/svg','line');
+    line.setAttribute('x1',x1); line.setAttribute('y1',y1);
+    line.setAttribute('x2',x2); line.setAttribute('y2',y2);
+    line.classList.add('tick');
+    line.dataset.threshold = threshold;
+    tickGroup.appendChild(line);
+  }
+
+  const CIRC = 2 * Math.PI * 130;
+  const gaugeFill = document.getElementById('gaugeFill');
+  gaugeFill.style.strokeDasharray = CIRC;
+
+  // ---------- checkpoints (right panel) ----------
+  const cpList = document.getElementById('checkpointList');
+  stages.forEach(st=>{
+    const el = document.createElement('div');
+    el.className = 'checkpoint';
+    el.dataset.at = st.at;
+    el.innerHTML = `
+      <div class="checkpoint-dot"></div>
+      <div class="checkpoint-body">
+        <b>${st.label}</b>
+        <span>${String(st.at).padStart(3,'0')}%</span>
+      </div>`;
+    cpList.appendChild(el);
+  });
+
+  // ---------- system health (decorative sub-metrics) ----------
+  const healthDefs = [
+    {label:'Design', weight:1.3},
+    {label:'Build', weight:1.0},
+    {label:'QA / Verification', weight:0.75},
+    {label:'Deployment', weight:0.45}
+  ];
+  const healthList = document.getElementById('healthList');
+  healthDefs.forEach(h=>{
+    const row = document.createElement('div');
+    row.className = 'health-row';
+    row.dataset.weight = h.weight;
+    row.innerHTML = `
+      <div class="health-top"><span>${h.label}</span><span class="hval">0%</span></div>
+      <div class="health-bar"><div class="health-fill" style="width:0%"></div></div>`;
+    healthList.appendChild(row);
+  });
+
+  // ---------- event log ----------
+  const logList = document.getElementById('logList');
+  const logSeed = [
+    {t:'09:02', txt:'Project PZ-0142 initiated by Pazovado Team.'},
+    {t:'09:14', txt:'Client account linked to live dashboard.'},
+    {t:'11:40', txt:'Intake assets received and queued for review.'},
+    {t:'14:05', txt:'Checkpoint advanced — now Reviewing.'},
+  ];
+  logSeed.forEach(l => addLog(l.txt, l.t, true));
+
+  function addLog(text, time, hit){
+    const item = document.createElement('div');
+    item.className = 'log-item' + (hit ? ' hit' : '');
+    item.innerHTML = `<div class="log-dot"></div><div><div class="log-text">${text}</div><div class="log-time">${time}</div></div>`;
+    logList.prepend(item);
+  }
+
+  function render(){
+    // ticks
+    document.querySelectorAll('.tick').forEach(t=>{
+      const th = parseInt(t.dataset.threshold);
+      t.classList.toggle('filled', progress >= th);
+      t.classList.toggle('current', progress === th);
+    });
+
+    // gauge fill
+    const offset = CIRC * (1 - progress/100);
+    gaugeFill.style.strokeDashoffset = offset;
+
+    // checkpoints
+    document.querySelectorAll('.checkpoint').forEach(c=>{
+      c.classList.toggle('reached', progress >= parseInt(c.dataset.at));
+    });
+
+    // health bars (decorative, scaled off overall progress)
+    document.querySelectorAll('.health-row').forEach(row=>{
+      const w = parseFloat(row.dataset.weight);
+      const val = Math.max(0, Math.min(100, Math.round(progress * w)));
+      row.querySelector('.health-fill').style.width = val + '%';
+      row.querySelector('.hval').textContent = val + '%';
+    });
+
+    const stage = currentStage(progress);
+    document.getElementById('percentText').textContent = String(progress).padStart(2,'0') + '%';
+    document.getElementById('stepText').textContent = `STEP ${progress/5} / 20`;
+    document.getElementById('statusWord').textContent = stage.label;
+    document.getElementById('stageDetail').textContent = stage.label;
+  }
+
+  function setProgress(v){
+    const next = Math.max(0, Math.min(100, Math.round(v/5)*5));
+    if(next === progress) return;
+    progress = next;
+    render();
+    const now = new Date();
+    const time = now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0');
+    addLog(`Checkpoint updated to ${progress}% — ${currentStage(progress).label}.`, time, true);
+  }
+  function stepProgress(delta){ setProgress(progress + delta); }
+
+  render();
+
+  // ---------- chat ----------
+  function toggleChat(){
+    const panel = document.getElementById('chatPanel');
+    panel.classList.toggle('open');
+    if(panel.classList.contains('open')){
+      document.getElementById('chatLauncher').querySelector('.chat-ping').style.display = 'none';
+    }
+  }
+
+  function sendMessage(){
+    const input = document.getElementById('chatInput');
+    const text = input.value.trim();
+    if(!text) return;
+    const body = document.getElementById('chatBody');
+    const now = new Date();
+    const time = now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0');
+
+    const mine = document.createElement('div');
+    mine.className = 'msg me';
+    mine.innerHTML = text.replace(/</g,'&lt;') + `<div class="msg-time">${time}</div>`;
+    body.appendChild(mine);
+    input.value = '';
+    body.scrollTop = body.scrollHeight;
+
+    setTimeout(()=>{
+      const reply = document.createElement('div');
+      reply.className = 'msg them';
+      const replyText = currentRole === 'admin'
+        ? "Got it — I'll take a look and update the checkpoint shortly."
+        : "Thanks for the note — we'll get back to you shortly.";
+      reply.innerHTML = replyText + `<div class="msg-time">${time}</div>`;
+      body.appendChild(reply);
+      body.scrollTop = body.scrollHeight;
+    }, 900);
+  }
+</script>
+
+</body>
+</html>
