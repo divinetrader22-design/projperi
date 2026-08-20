@@ -20,7 +20,7 @@ html,body{height:100%;}
 body{
   background:var(--void);
   color:var(--text);
-  font-family:'Inter', sans-serif;
+  font-family:'Space Grotesk', sans-serif;
   min-height:100vh;
   overflow-x:hidden;
   position:relative;
@@ -75,7 +75,7 @@ body{
 .brand svg{ width:34px; height:34px; display:block; }
 .brand-text{ display:flex; flex-direction:column; line-height:1.05; }
 .brand-name{
-  font-family:'Chakra Petch', sans-serif; font-weight:700; font-size:19px;
+  font-family:'Orbitron', sans-serif; font-weight:700; font-size:19px;
   letter-spacing:.06em; color:var(--text);
 }
 .brand-sub{
@@ -89,7 +89,7 @@ body{
   padding:6px 12px; border-radius:100px; text-transform:uppercase;
 }
 .logout-btn{
-  font-family:'Inter'; font-size:13px; color:var(--muted); background:transparent;
+  font-family:'Space Grotesk'; font-size:13px; color:var(--muted); background:transparent;
   border:1px solid var(--line); padding:8px 16px; border-radius:8px; cursor:pointer;
   transition:.2s; text-decoration:none; display:inline-block;
 }
@@ -117,7 +117,7 @@ body{
 @keyframes float{ 0%,100%{ transform:translateY(0); } 50%{ transform:translateY(-8px); } }
 .login-headline{
   position:relative; z-index:2;
-  font-family:'Chakra Petch', sans-serif; font-weight:600;
+  font-family:'Orbitron', sans-serif; font-weight:600;
   font-size:44px; line-height:1.12; letter-spacing:.01em;
   max-width:520px;
   opacity:0; animation: rise .7s ease .08s forwards;
@@ -153,7 +153,7 @@ body{
   opacity:0; animation: rise .7s ease .2s forwards;
 }
 .login-card h2{
-  font-family:'Chakra Petch', sans-serif; font-size:20px; font-weight:600; letter-spacing:.02em;
+  font-family:'Orbitron', sans-serif; font-size:20px; font-weight:600; letter-spacing:.02em;
   margin-bottom:6px;
 }
 .login-card p.hint{ color:var(--muted); font-size:13px; margin-bottom:22px; }
@@ -180,14 +180,14 @@ body{
 .field input{
   width:100%; background:var(--void); border:1px solid var(--line);
   border-radius:8px; padding:11px 13px; color:var(--text); font-size:14px;
-  font-family:'Inter'; outline:none; transition:.2s;
+  font-family:'Space Grotesk'; outline:none; transition:.2s;
 }
 .field input:focus{ border-color:var(--cyan); box-shadow:0 0 0 3px rgba(55,232,255,.12); }
 .field input::placeholder{ color:var(--muted-dim); }
 
 .enter-btn{
   width:100%; border:none; border-radius:9px; padding:13px 0; margin-top:8px;
-  background:var(--grad); color:#0a0e18; font-family:'Chakra Petch', sans-serif;
+  background:var(--grad); color:#0a0e18; font-family:'Orbitron', sans-serif;
   font-weight:600; font-size:14px; letter-spacing:.04em; cursor:pointer;
   text-transform:uppercase; transition:transform .15s, box-shadow .15s;
   box-shadow: 0 10px 30px -10px rgba(123,92,250,.55);
@@ -238,9 +238,9 @@ body{
 .chat-avatar{
   width:34px; height:34px; border-radius:9px; background:var(--grad);
   display:flex; align-items:center; justify-content:center;
-  font-family:'Chakra Petch', sans-serif; font-weight:700; font-size:13px; color:#0a0e18;
+  font-family:'Orbitron', sans-serif; font-weight:700; font-size:13px; color:#0a0e18;
 }
-.chat-title{ font-family:'Chakra Petch', sans-serif; font-size:14px; font-weight:600; }
+.chat-title{ font-family:'Orbitron', sans-serif; font-size:14px; font-weight:600; }
 .chat-status{ font-size:11px; color:var(--green); display:flex; align-items:center; gap:5px; margin-top:2px; font-family:'JetBrains Mono', monospace;}
 .chat-status .dot{ width:5px; height:5px; border-radius:50%; background:var(--green); box-shadow:0 0 6px var(--green); }
 .chat-close{ background:transparent; border:none; color:var(--muted); cursor:pointer; padding:4px; }
@@ -277,7 +277,7 @@ body{
 }
 .chat-input-row input{
   flex:1; background:var(--void); border:1px solid var(--line); border-radius:9px;
-  padding:10px 12px; color:var(--text); font-size:13px; font-family:'Inter'; outline:none;
+  padding:10px 12px; color:var(--text); font-size:13px; font-family:'Space Grotesk'; outline:none;
 }
 .chat-input-row input:focus{ border-color:var(--cyan); }
 .chat-attach, .chat-send{
