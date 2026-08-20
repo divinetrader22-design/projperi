@@ -16,6 +16,9 @@
 --        update public.projects set client_id =
 --          (select id from auth.users where email = 'client@example.com')
 --        where ref = 'PZ-0142';
+--   4. For chat image uploads to work: Supabase Dashboard -> Storage ->
+--      New bucket -> name it exactly "chat-attachments" -> keep it PRIVATE.
+--      (This SQL script sets up the access policies for that bucket below.)
 -- ============================================================
 
 -- 1. Profiles (extends auth.users with a role)
@@ -142,9 +145,17 @@ create table if not exists public.messages (
   project_id uuid not null references public.projects(id) on delete cascade,
   sender_id uuid not null references auth.users(id) on delete cascade,
   sender_role text not null check (sender_role in ('client', 'admin')),
-  content text not null,
+  content text not null default '',
+  attachment_path text,
   created_at timestamptz not null default now()
 );
+
+-- Migrate older installs: allow empty content (image-only messages) and add attachment_path.
+alter table public.messages alter column content set default '';
+alter table public.messages alter column content drop not null;
+update public.messages set content = '' where content is null;
+alter table public.messages alter column content set not null;
+alter table public.messages add column if not exists attachment_path text;
 
 alter table public.messages enable row level security;
 
@@ -174,7 +185,43 @@ create policy "Only project participants can send messages"
     )
   );
 
--- 5. Enable realtime on the tables the dashboard subscribes to
+-- 5. Chat image attachments (Supabase Storage)
+-- One-time manual step (SQL can't create buckets): in Supabase Dashboard ->
+-- Storage -> New bucket -> name it exactly "chat-attachments" -> keep it PRIVATE.
+-- The policies below then restrict who can upload/view files in it, the same
+-- way messages are restricted: only admins and the project's linked client.
+drop policy if exists "Only project participants can view chat attachments" on storage.objects;
+drop policy if exists "Only project participants can upload chat attachments" on storage.objects;
+
+create policy "Only project participants can view chat attachments"
+  on storage.objects for select
+  using (
+    bucket_id = 'chat-attachments'
+    and (
+      public.is_admin()
+      or exists (
+        select 1 from public.projects p
+        where p.id::text = (storage.foldername(name))[1]
+        and p.client_id = auth.uid()
+      )
+    )
+  );
+
+create policy "Only project participants can upload chat attachments"
+  on storage.objects for insert
+  with check (
+    bucket_id = 'chat-attachments'
+    and (
+      public.is_admin()
+      or exists (
+        select 1 from public.projects p
+        where p.id::text = (storage.foldername(name))[1]
+        and p.client_id = auth.uid()
+      )
+    )
+  );
+
+-- 6. Enable realtime on the tables the dashboard subscribes to
 do $$
 begin
   if not exists (
