@@ -100,7 +100,7 @@ body{
 /* ================= LOGIN PAGE ================= */
 .login-page{ min-height:100vh; display:flex; position:relative; z-index:2; }
 .login-left{
-  flex:1.1; position:relative; display:flex; flex-direction:column;
+  flex:1.1; position:relative; z-index:0; display:flex; flex-direction:column;
   justify-content:center; padding:60px 70px;
   border-right:1px solid var(--line);
   overflow:hidden;
@@ -305,7 +305,7 @@ body{
 
 /* ---------- 3D ambient shapes ---------- */
 .scene3d{
-  position:absolute; pointer-events:none; z-index:1;
+  position:absolute; pointer-events:none; z-index:-1;
   perspective:900px;
 }
 .cube3d{

@@ -79,6 +79,9 @@
     <!-- LEFT: event log -->
     <div class="panel">
       <span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span>
+      <div class="scene3d" style="width:56px; height:56px; top:10px; right:14px; opacity:.7;">
+        <div class="ring3d"><div class="band"></div><div class="band"></div><div class="band"></div></div>
+      </div>
       <div class="panel-head">
         <span class="panel-title">Event Log</span>
         <span class="panel-led"><span class="dot"></span>Streaming</span>
@@ -89,8 +92,15 @@
     <!-- CENTER: hero gauge -->
     <div class="panel hero-panel">
       <span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span>
-      <div class="scene3d" style="width:80px; height:80px; top:20px; right:26px;">
-        <div class="pyramid3d" style="--pd:56px;">
+      <div class="scene3d" style="width:52px; height:52px; top:16px; left:20px; opacity:.6;">
+        <div class="cube3d" style="--cd:26px;">
+          <div class="face front"></div><div class="face back"></div>
+          <div class="face right"></div><div class="face left"></div>
+          <div class="face top"></div><div class="face bottom"></div>
+        </div>
+      </div>
+      <div class="scene3d" style="width:52px; height:52px; top:16px; right:20px; opacity:.6;">
+        <div class="pyramid3d" style="--pd:34px;">
           <div class="tri"></div><div class="tri"></div><div class="tri"></div><div class="tri"></div>
         </div>
       </div>
@@ -131,6 +141,13 @@
     <div class="right-col">
       <div class="panel">
         <span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span>
+        <div class="scene3d" style="width:56px; height:56px; top:10px; right:14px; opacity:.7;">
+          <div class="cube3d" style="--cd:28px;">
+            <div class="face front"></div><div class="face back"></div>
+            <div class="face right"></div><div class="face left"></div>
+            <div class="face top"></div><div class="face bottom"></div>
+          </div>
+        </div>
         <div class="panel-head">
           <span class="panel-title">Checkpoints</span>
         </div>
