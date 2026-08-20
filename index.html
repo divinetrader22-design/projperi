@@ -11,6 +11,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-config.js"></script>
 <script src="particles.js"></script>
+<script src="tilt3d.js"></script>
 </head>
 <body>
 
@@ -22,7 +23,17 @@
 
 <section class="login-page">
   <div class="login-left">
-    <div class="login-mark">
+    <div class="scene3d" style="width:120px; height:120px; top:34px; right:34px;">
+      <div class="cube3d" style="--cd:60px;">
+        <div class="face front"></div><div class="face back"></div>
+        <div class="face right"></div><div class="face left"></div>
+        <div class="face top"></div><div class="face bottom"></div>
+      </div>
+    </div>
+    <div class="scene3d" style="width:70px; height:70px; bottom:60px; right:90px;">
+      <div class="ring3d"><div class="band"></div><div class="band"></div><div class="band"></div></div>
+    </div>
+    <div class="login-mark tilt-3d">
       <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
         <defs>
           <linearGradient id="lg1" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
@@ -47,7 +58,7 @@
   </div>
 
   <div class="login-right">
-    <div class="login-card">
+    <div class="login-card tilt-3d">
       <h2>Sign in to Provada</h2>
       <p class="hint">Access is by invitation only — use the credentials provided to you.</p>
 

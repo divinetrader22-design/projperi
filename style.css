@@ -290,8 +290,11 @@ body{
 .chat-attach:hover{ color:var(--cyan); border-color:var(--cyan); }
 
 @media (max-width: 880px){
-  .login-left{ display:none; }
-  .login-right{ width:100%; }
+  .login-page{ flex-direction:column; }
+  .login-left{ display:flex; flex:none; padding:40px 26px 30px; border-right:none; border-bottom:1px solid var(--line); }
+  .login-headline{ font-size:32px; }
+  .login-footprint{ flex-wrap:wrap; gap:20px; margin-top:30px; }
+  .login-right{ width:100%; padding:30px 26px 50px; }
   .chat-panel{ width:calc(100vw - 32px); right:16px; bottom:16px; height:60vh; }
   .chat-launcher{ right:16px; bottom:16px; }
 }
@@ -299,3 +302,71 @@ body{
 @media (prefers-reduced-motion: reduce){
   *{ animation-duration:.001s !important; transition-duration:.001s !important; }
 }
+
+/* ---------- 3D ambient shapes ---------- */
+.scene3d{
+  position:absolute; pointer-events:none; z-index:1;
+  perspective:900px;
+}
+.cube3d{
+  position:relative; width:100%; height:100%;
+  transform-style:preserve-3d;
+  animation: cubeSpin 16s linear infinite;
+}
+.cube3d .face{
+  position:absolute; inset:0;
+  border:1px solid rgba(55,232,255,.45);
+  background:linear-gradient(135deg, rgba(123,92,250,.22), rgba(55,232,255,.08));
+  box-shadow: inset 0 0 20px rgba(55,232,255,.08);
+}
+.cube3d .face.front{ transform:translateZ(var(--cd)); }
+.cube3d .face.back{ transform:translateZ(calc(var(--cd) * -1)) rotateY(180deg); }
+.cube3d .face.right{ transform:rotateY(90deg) translateZ(var(--cd)); }
+.cube3d .face.left{ transform:rotateY(-90deg) translateZ(var(--cd)); }
+.cube3d .face.top{ transform:rotateX(90deg) translateZ(var(--cd)); }
+.cube3d .face.bottom{ transform:rotateX(-90deg) translateZ(var(--cd)); }
+@keyframes cubeSpin{
+  from{ transform:rotateX(0deg) rotateY(0deg) rotateZ(0deg); }
+  to{ transform:rotateX(360deg) rotateY(360deg) rotateZ(360deg); }
+}
+
+.pyramid3d{
+  position:relative; width:100%; height:100%;
+  transform-style:preserve-3d;
+  animation: pyramidSpin 20s linear infinite reverse;
+}
+.pyramid3d .tri{
+  position:absolute; left:50%; top:50%; width:0; height:0;
+  border-left:calc(var(--pd) / 2) solid transparent;
+  border-right:calc(var(--pd) / 2) solid transparent;
+  border-bottom:var(--pd) solid rgba(123,92,250,.22);
+  transform-origin:bottom center;
+  margin-left:calc(var(--pd) / -2);
+}
+.pyramid3d .tri:nth-child(1){ transform:translateY(calc(var(--pd) * -1)) rotateY(0deg) rotateX(20deg); border-bottom-color:rgba(55,232,255,.28); }
+.pyramid3d .tri:nth-child(2){ transform:translateY(calc(var(--pd) * -1)) rotateY(90deg) rotateX(20deg); border-bottom-color:rgba(123,92,250,.28); }
+.pyramid3d .tri:nth-child(3){ transform:translateY(calc(var(--pd) * -1)) rotateY(180deg) rotateX(20deg); border-bottom-color:rgba(67,245,165,.22); }
+.pyramid3d .tri:nth-child(4){ transform:translateY(calc(var(--pd) * -1)) rotateY(270deg) rotateX(20deg); border-bottom-color:rgba(55,232,255,.28); }
+@keyframes pyramidSpin{
+  from{ transform:rotateY(0deg); }
+  to{ transform:rotateY(360deg); }
+}
+
+.ring3d{
+  position:relative; width:100%; height:100%; transform-style:preserve-3d;
+  animation: ringSpin 14s linear infinite;
+}
+.ring3d .band{
+  position:absolute; inset:0; border-radius:50%;
+  border:2px solid rgba(55,232,255,.35);
+}
+.ring3d .band:nth-child(1){ transform:rotateX(70deg); }
+.ring3d .band:nth-child(2){ transform:rotateX(70deg) rotateZ(60deg); border-color:rgba(123,92,250,.3); }
+.ring3d .band:nth-child(3){ transform:rotateX(70deg) rotateZ(120deg); border-color:rgba(67,245,165,.25); }
+@keyframes ringSpin{
+  from{ transform:rotateY(0deg); }
+  to{ transform:rotateY(360deg); }
+}
+
+/* subtle pointer-tilt interaction, applied via tilt3d.js */
+.tilt-3d{ transform-style:preserve-3d; transition:transform .25s ease; will-change:transform; }

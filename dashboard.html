@@ -14,6 +14,7 @@
 <script src="supabase-config.js"></script>
 <script src="particles.js"></script>
 <script src="arcade.js"></script>
+<script src="tilt3d.js"></script>
 </head>
 <body>
 
@@ -88,6 +89,11 @@
     <!-- CENTER: hero gauge -->
     <div class="panel hero-panel">
       <span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span>
+      <div class="scene3d" style="width:80px; height:80px; top:20px; right:26px;">
+        <div class="pyramid3d" style="--pd:56px;">
+          <div class="tri"></div><div class="tri"></div><div class="tri"></div><div class="tri"></div>
+        </div>
+      </div>
       <div class="hero-eyebrow"><span class="dot"></span>Live project · #<span id="heroRef">PZ-0142</span></div>
 
       <div class="gauge-wrap">
