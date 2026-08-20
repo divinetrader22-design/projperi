@@ -145,7 +145,7 @@
   <!-- session info strip -->
   <div class="panel session-strip">
     <span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span>
-    <div class="info-row"><span>Started</span><span>2026-07-30</span></div>
+    <div class="info-row"><span>Started</span><span id="tickerStart">2026-07-30</span></div>
     <div class="info-row"><span>Current checkpoint</span><span id="stageDetail">Initiated</span></div>
     <div class="info-row"><span>Last update</span><span>Just now</span></div>
     <div class="info-row"><span>Status</span><span style="color:var(--cyan)">On track</span></div>
@@ -398,6 +398,7 @@
     document.getElementById('heroRef').textContent = cfg.projectRef || 'PZ-0142';
     document.getElementById('tickerClient').textContent = cfg.clientName || '—';
     document.getElementById('tickerEta').textContent = cfg.estCompletion || '—';
+    document.getElementById('tickerStart').textContent = cfg.startDate || '—';
 
     document.getElementById('roleBadge').textContent = currentRole === 'admin' ? 'ADMIN ACCESS' : 'CLIENT ACCESS';
     document.getElementById('adminControls').style.display = currentRole === 'admin' ? 'flex' : 'none';
