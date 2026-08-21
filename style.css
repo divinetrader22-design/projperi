@@ -252,12 +252,41 @@ body{
 .chat-body::-webkit-scrollbar{ width:5px; }
 .chat-body::-webkit-scrollbar-thumb{ background:var(--line); border-radius:10px; }
 
-.msg{ max-width:78%; font-size:13.5px; line-height:1.45; padding:10px 13px; border-radius:12px; }
+.msg{ max-width:78%; font-size:13.5px; line-height:1.45; padding:10px 13px; border-radius:12px; position:relative; }
 .msg.them{ align-self:flex-start; background:var(--void); border:1px solid var(--line); border-bottom-left-radius:3px; }
 .msg.me{ align-self:flex-end; background:var(--grad); color:#0a0e18; border-bottom-right-radius:3px; font-weight:500; }
-.msg-time{ font-family:'JetBrains Mono', monospace; font-size:9.5px; color:var(--muted-dim); margin-top:4px; }
-.msg.me .msg-time{ text-align:right; color:rgba(10,14,24,.6); }
+.msg-text{ white-space:pre-wrap; word-break:break-word; }
+.msg-foot{ display:flex; align-items:center; justify-content:space-between; gap:8px; margin-top:4px; }
+.msg-time{ font-family:'JetBrains Mono', monospace; font-size:9.5px; color:var(--muted-dim); }
+.msg.me .msg-time{ color:rgba(10,14,24,.6); }
+.msg-edited{ font-style:italic; opacity:.85; }
 .chat-img{ display:block; max-width:100%; max-height:220px; border-radius:8px; margin-bottom:6px; cursor:zoom-in; }
+
+.msg-edit-btn{
+  flex-shrink:0; width:18px; height:18px; border-radius:5px; border:none;
+  background:transparent; color:var(--muted-dim); cursor:pointer;
+  display:flex; align-items:center; justify-content:center; transition:.15s; opacity:0;
+}
+.msg:hover .msg-edit-btn{ opacity:1; }
+.msg.me .msg-edit-btn{ color:rgba(10,14,24,.55); }
+.msg-edit-btn:hover{ color:var(--cyan); background:rgba(55,232,255,.12); }
+.msg.me .msg-edit-btn:hover{ color:#0a0e18; background:rgba(10,14,24,.15); }
+
+.msg-editor{ display:flex; flex-direction:column; gap:6px; }
+.msg-edit-input{
+  width:100%; min-width:180px; resize:vertical; min-height:44px;
+  background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.2); border-radius:8px;
+  padding:8px 10px; font-family:'Space Grotesk'; font-size:13px; color:inherit; outline:none;
+}
+.msg.them .msg-edit-input{ background:var(--panel); border-color:var(--line); color:var(--text); }
+.msg-edit-actions{ display:flex; justify-content:flex-end; gap:8px; }
+.msg-edit-actions button{
+  font-family:'JetBrains Mono', monospace; font-size:10.5px; padding:5px 10px; border-radius:6px;
+  border:1px solid rgba(255,255,255,.25); background:transparent; color:inherit; cursor:pointer;
+}
+.msg.them .msg-edit-actions button{ border-color:var(--line); color:var(--muted); }
+.msg-edit-actions .msg-edit-save{ background:rgba(255,255,255,.2); font-weight:600; }
+.msg.them .msg-edit-actions .msg-edit-save{ background:var(--grad); color:#0a0e18; border-color:transparent; }
 
 .chat-preview{
   display:flex; align-items:center; gap:10px; padding:10px 14px;

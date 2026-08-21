@@ -161,6 +161,7 @@ alter table public.messages alter column content drop not null;
 update public.messages set content = '' where content is null;
 alter table public.messages alter column content set not null;
 alter table public.messages add column if not exists attachment_path text;
+alter table public.messages add column if not exists edited_at timestamptz;
 
 alter table public.messages enable row level security;
 
@@ -168,6 +169,7 @@ drop policy if exists "Authenticated users can view messages" on public.messages
 drop policy if exists "Only project participants can view messages" on public.messages;
 drop policy if exists "Authenticated users can send messages" on public.messages;
 drop policy if exists "Only project participants can send messages" on public.messages;
+drop policy if exists "Senders can edit their own messages" on public.messages;
 
 -- A client only ever sees messages on their own project's thread; admins see all.
 -- No client can ever read another client's conversation.
@@ -189,6 +191,15 @@ create policy "Only project participants can send messages"
       or exists (select 1 from public.projects p where p.id = messages.project_id and p.client_id = auth.uid())
     )
   );
+
+-- Editing: only the original sender may edit their own message, and only
+-- the content/attachment/edited_at can change (sender/project stay fixed —
+-- enforced on the client by only sending those columns, and on the server
+-- because the USING/WITH CHECK clause requires sender_id to stay the same).
+create policy "Senders can edit their own messages"
+  on public.messages for update
+  using (auth.uid() = sender_id)
+  with check (auth.uid() = sender_id);
 
 -- 5. Chat image attachments (Supabase Storage)
 -- One-time manual step (SQL can't create buckets): in Supabase Dashboard ->
