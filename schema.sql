@@ -126,6 +126,7 @@ alter table public.event_log enable row level security;
 drop policy if exists "Authenticated users can view event log" on public.event_log;
 drop policy if exists "Only project participants can view event log" on public.event_log;
 drop policy if exists "Only admins can insert event log entries" on public.event_log;
+drop policy if exists "Only admins can delete event log entries" on public.event_log;
 
 -- Only the admin team and the specific linked client can see a project's log.
 create policy "Only project participants can view event log"
@@ -138,6 +139,10 @@ create policy "Only project participants can view event log"
 create policy "Only admins can insert event log entries"
   on public.event_log for insert
   with check (public.is_admin());
+
+create policy "Only admins can delete event log entries"
+  on public.event_log for delete
+  using (public.is_admin());
 
 -- 4. Chat messages (live support chat between client and admin)
 create table if not exists public.messages (

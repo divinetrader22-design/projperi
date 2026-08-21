@@ -78,12 +78,21 @@
 .log-list::-webkit-scrollbar-thumb{ background:var(--line); border-radius:10px; }
 .log-item{
   display:flex; gap:10px; padding:10px 4px; border-bottom:1px solid var(--line-soft);
+  align-items:flex-start;
 }
 .log-item:last-child{ border-bottom:none; }
 .log-dot{ width:6px; height:6px; border-radius:50%; margin-top:5px; flex-shrink:0; background:var(--muted-dim); }
 .log-item.hit .log-dot{ background:var(--cyan); box-shadow:0 0 6px var(--cyan); }
+.log-body{ flex:1; min-width:0; }
 .log-text{ font-size:12.5px; color:var(--text); line-height:1.4; }
 .log-time{ font-family:'JetBrains Mono', monospace; font-size:10px; color:var(--muted-dim); margin-top:3px; }
+.log-remove{
+  flex-shrink:0; width:20px; height:20px; border-radius:6px; margin-top:1px;
+  background:transparent; border:1px solid transparent; color:var(--muted-dim);
+  display:flex; align-items:center; justify-content:center; cursor:pointer; transition:.15s;
+}
+.log-remove:hover{ color:#ff6b6b; border-color:rgba(255,107,107,.4); background:rgba(255,107,107,.08); }
+.log-remove:disabled{ opacity:.4; cursor:default; }
 
 /* ---------- hero gauge (center) ---------- */
 .hero-panel{ display:flex; flex-direction:column; align-items:center; padding:30px 22px 26px; }

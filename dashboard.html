@@ -290,11 +290,31 @@
   // ---------- event log ----------
   const logList = document.getElementById('logList');
 
-  function addLog(text, time, hit){
+  function addLog(text, time, hit, id){
     const item = document.createElement('div');
     item.className = 'log-item' + (hit ? ' hit' : '');
-    item.innerHTML = `<div class="log-dot"></div><div><div class="log-text">${text}</div><div class="log-time">${time}</div></div>`;
+    if (id !== undefined) item.dataset.logId = id;
+    const removeBtn = currentRole === 'admin' && id !== undefined
+      ? `<button class="log-remove" title="Remove entry" onclick="deleteLogEntry(${id}, this)">
+           <svg width="11" height="11" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>
+         </button>`
+      : '';
+    item.innerHTML = `<div class="log-dot"></div><div class="log-body"><div class="log-text">${text}</div><div class="log-time">${time}</div></div>${removeBtn}`;
     logList.prepend(item);
+  }
+
+  async function deleteLogEntry(id, btn){
+    if (currentRole !== 'admin') return;
+    if (btn) btn.disabled = true;
+    const { error } = await supabaseClient.from('event_log').delete().eq('id', id);
+    if (error) { console.error(error); if (btn) btn.disabled = false; return; }
+    const item = logList.querySelector(`[data-log-id="${id}"]`);
+    if (item) item.remove();
+  }
+
+  function removeLogEntryFromUI(id){
+    const item = logList.querySelector(`[data-log-id="${id}"]`);
+    if (item) item.remove();
   }
 
   function fmtTime(iso){
@@ -471,7 +491,7 @@
     const { data: events } = await supabaseClient
       .from('event_log').select('*').eq('project_id', project.id)
       .order('created_at', { ascending: true }).limit(50);
-    (events || []).forEach(e => addLog(e.message, fmtTime(e.created_at), true));
+    (events || []).forEach(e => addLog(e.message, fmtTime(e.created_at), true, e.id));
 
     const { data: messages } = await supabaseClient
       .from('messages').select('*').eq('project_id', project.id)
@@ -484,7 +504,9 @@
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'projects', filter: `id=eq.${project.id}` },
         payload => { project = payload.new; render(project.progress); })
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'event_log', filter: `project_id=eq.${project.id}` },
-        payload => addLog(payload.new.message, fmtTime(payload.new.created_at), true))
+        payload => addLog(payload.new.message, fmtTime(payload.new.created_at), true, payload.new.id))
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'event_log' },
+        payload => removeLogEntryFromUI(payload.old.id))
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `project_id=eq.${project.id}` },
         payload => renderMessage(payload.new))
       .subscribe();
