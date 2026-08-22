@@ -200,7 +200,7 @@
 }
 
 .payments-admin-add{
-  display:flex; flex-direction:column; gap:8px; margin-bottom:14px;
+  display:flex; flex-direction:column; gap:16px; margin-bottom:14px;
   padding-bottom:14px; border-bottom:1px solid var(--line-soft);
 }
 .payments-admin-add input, .payments-admin-add select{
@@ -212,6 +212,20 @@
 .payments-add-row{ display:flex; gap:8px; }
 .payments-add-row select{ flex:1; }
 .payments-add-row .ctrl-btn{ flex-shrink:0; padding:8px 14px; font-size:11.5px; }
+
+.payments-add-block{
+  display:flex; flex-direction:column; gap:8px; padding:12px; border-radius:9px;
+  border:1px solid var(--line-soft); background:rgba(255,255,255,.015);
+}
+.payments-add-heading{
+  font-family:'JetBrains Mono', monospace; font-size:10.5px; letter-spacing:.08em;
+  text-transform:uppercase; font-weight:600; margin-bottom:2px;
+}
+.payments-add-heading.paid{ color:var(--green); }
+.payments-add-heading.due{ color:var(--amber); }
+.payments-add-block .ctrl-btn{ width:100%; margin-top:2px; }
+.ctrl-btn.due{ background:linear-gradient(135deg, #ffb84d, #ff8a3d); color:#1a1206; border:none; font-weight:600; }
+.ctrl-btn.due:hover{ opacity:.9; color:#1a1206; }
 
 .payments-wallet{
   margin-bottom:14px; padding-bottom:14px; border-bottom:1px solid var(--line-soft);

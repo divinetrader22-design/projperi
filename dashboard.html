@@ -208,18 +208,24 @@
         </div>
 
         <div class="payments-admin-add" id="paymentsAddForm" style="display:none;">
-          <input type="number" step="0.01" min="0.01" id="paymentAmount" placeholder="Amount">
-          <input type="text" id="paymentDesc" placeholder="Description">
-          <label class="payments-field-label">Date recorded</label>
-          <input type="date" id="paymentDate" title="Date recorded (backdate if posting a backlog)">
-          <label class="payments-field-label">Settle by (only for "Amount due")</label>
-          <input type="date" id="paymentSettleBy" title="Settle by (only applies to 'Amount due')">
-          <div class="payments-add-row">
-            <select id="paymentKind">
-              <option value="paid">Payment made</option>
-              <option value="due">Amount due</option>
-            </select>
-            <button class="ctrl-btn primary" onclick="addPayment()">Add</button>
+          <div class="payments-add-block">
+            <div class="payments-add-heading paid">Add payment made</div>
+            <input type="number" step="0.01" min="0.01" id="paidAmount" placeholder="Amount">
+            <input type="text" id="paidDesc" placeholder="Description">
+            <label class="payments-field-label">Date recorded</label>
+            <input type="date" id="paidDate" title="Date recorded (backdate if posting a backlog)">
+            <button class="ctrl-btn primary" onclick="addPaidPayment()">Add payment made</button>
+          </div>
+
+          <div class="payments-add-block">
+            <div class="payments-add-heading due">Add amount due</div>
+            <input type="number" step="0.01" min="0.01" id="dueAmount" placeholder="Amount">
+            <input type="text" id="dueDesc" placeholder="Description">
+            <label class="payments-field-label">Date recorded</label>
+            <input type="date" id="dueDate" title="Date recorded (backdate if posting a backlog)">
+            <label class="payments-field-label">Settle by</label>
+            <input type="date" id="dueSettleBy" title="Date this amount must be settled by">
+            <button class="ctrl-btn primary due" onclick="addDuePayment()">Add amount due</button>
           </div>
         </div>
 
@@ -451,13 +457,11 @@
     }).join('');
   }
 
-  async function addPayment(){
+  async function addPaidPayment(){
     if (currentRole !== 'admin' || !project) return;
-    const amountInput = document.getElementById('paymentAmount');
-    const descInput = document.getElementById('paymentDesc');
-    const kindSelect = document.getElementById('paymentKind');
-    const dateInput = document.getElementById('paymentDate');
-    const settleByInput = document.getElementById('paymentSettleBy');
+    const amountInput = document.getElementById('paidAmount');
+    const descInput = document.getElementById('paidDesc');
+    const dateInput = document.getElementById('paidDate');
 
     const amount = parseFloat(amountInput.value);
     if (!amount || amount <= 0) { alert('Enter a valid amount.'); return; }
@@ -466,12 +470,39 @@
       project_id: project.id,
       amount: amount,
       description: descInput.value.trim(),
-      kind: kindSelect.value,
+      kind: 'paid',
       occurred_on: dateInput.value || new Date().toISOString().slice(0, 10),
-      settle_by: kindSelect.value === 'due' ? (settleByInput.value || null) : null,
+      settle_by: null,
       created_by: sessionUser.id
     });
     if (error) { console.error(error); alert('Could not add payment: ' + error.message); return; }
+
+    amountInput.value = '';
+    descInput.value = '';
+    dateInput.value = new Date().toISOString().slice(0, 10);
+    // UI updates via realtime INSERT subscription.
+  }
+
+  async function addDuePayment(){
+    if (currentRole !== 'admin' || !project) return;
+    const amountInput = document.getElementById('dueAmount');
+    const descInput = document.getElementById('dueDesc');
+    const dateInput = document.getElementById('dueDate');
+    const settleByInput = document.getElementById('dueSettleBy');
+
+    const amount = parseFloat(amountInput.value);
+    if (!amount || amount <= 0) { alert('Enter a valid amount.'); return; }
+
+    const { error } = await supabaseClient.from('payments').insert({
+      project_id: project.id,
+      amount: amount,
+      description: descInput.value.trim(),
+      kind: 'due',
+      occurred_on: dateInput.value || new Date().toISOString().slice(0, 10),
+      settle_by: settleByInput.value || null,
+      created_by: sessionUser.id
+    });
+    if (error) { console.error(error); alert('Could not add amount due: ' + error.message); return; }
 
     amountInput.value = '';
     descInput.value = '';
@@ -780,8 +811,11 @@
     paymentsData = payments || [];
     renderPayments();
     renderWallet();
-    const paymentDateInput = document.getElementById('paymentDate');
-    if (paymentDateInput) paymentDateInput.value = new Date().toISOString().slice(0, 10);
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const paidDateInput = document.getElementById('paidDate');
+    const dueDateInput = document.getElementById('dueDate');
+    if (paidDateInput) paidDateInput.value = todayStr;
+    if (dueDateInput) dueDateInput.value = todayStr;
 
     // ---------- realtime: progress + event log + chat, all live ----------
     supabaseClient
