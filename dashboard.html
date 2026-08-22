@@ -427,8 +427,10 @@
     }).join('');
   }
 
-  // Groups outstanding "due" entries by settle_by date. One date -> single
-  // summary line. Multiple distinct dates -> a list, one row per date.
+  // Groups outstanding "due" entries by settle_by date, then applies paid
+  // amounts FIFO: earliest settle date gets paid off first, and later dates
+  // are only reduced once every earlier one is fully cleared. Only dates
+  // with a remaining balance are shown; cleared ones drop off the list.
   function renderSettleSchedule(){
     const wrap = document.getElementById('paymentsSettle');
     const listEl = document.getElementById('settleList');
@@ -441,18 +443,47 @@
       return;
     }
 
+    // Undated "due" entries have no schedule position but still consume
+    // paid funds first, since they carry no future grace date.
+    const undatedDue = paymentsData
+      .filter(p => p.kind === 'due' && !p.settle_by)
+      .reduce((s, p) => s + Number(p.amount), 0);
+
     const byDate = {};
     dueWithDates.forEach(p => {
       byDate[p.settle_by] = (byDate[p.settle_by] || 0) + Number(p.amount);
     });
     const dates = Object.keys(byDate).sort();
 
+    let pool = paymentsData
+      .filter(p => p.kind === 'paid')
+      .reduce((s, p) => s + Number(p.amount), 0);
+
+    // Consume the undated bucket first, then walk dated buckets oldest-first.
+    let remainingPool = Math.max(0, pool - undatedDue);
+
+    const remaining = {};
+    dates.forEach(d => {
+      const owed = byDate[d];
+      const applied = Math.min(remainingPool, owed);
+      remaining[d] = owed - applied;
+      remainingPool -= applied;
+    });
+
+    const outstandingDates = dates.filter(d => remaining[d] > 0.004);
+
+    if (!outstandingDates.length) {
+      wrap.style.display = 'none';
+      listEl.innerHTML = '';
+      return;
+    }
+
     wrap.style.display = 'block';
-    listEl.innerHTML = dates.map(d => {
+    listEl.innerHTML = outstandingDates.map(d => {
       const dateStr = new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
       return `<div class="settle-row">
         <span class="settle-date">${dateStr}</span>
-        <span class="settle-amount">${fmtMoney(byDate[d])}</span>
+        <span class="settle-amount">${fmtMoney(remaining[d])}</span>
       </div>`;
     }).join('');
   }
