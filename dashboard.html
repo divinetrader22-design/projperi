@@ -694,15 +694,21 @@
     }
     const textHtml = msg.content ? `<div class="msg-text">${String(msg.content).replace(/</g,'&lt;')}</div>` : '';
     const editedTag = msg.edited_at ? '<span class="msg-edited">(edited)</span>' : '';
+    const canDelete = mine || currentRole === 'admin';
     const editBtn = mine
       ? `<button class="msg-edit-btn" title="Edit message" onclick="startEditMessage(${msg.id})">
            <svg width="11" height="11" viewBox="0 0 24 24" fill="none"><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
          </button>`
       : '';
+    const deleteBtn = canDelete
+      ? `<button class="msg-delete-btn" title="Delete message" onclick="deleteMessage(${msg.id})">
+           <svg width="11" height="11" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+         </button>`
+      : '';
 
     el.innerHTML =
       `${mediaHtml}${textHtml}` +
-      `<div class="msg-foot"><span class="msg-time">${fmtTime(msg.created_at)}${editedTag ? ' ' + editedTag : ''}</span>${editBtn}</div>`;
+      `<div class="msg-foot"><span class="msg-time">${fmtTime(msg.created_at)}${editedTag ? ' ' + editedTag : ''}</span>${editBtn}${deleteBtn}</div>`;
     el._msgData = msg;
   }
 
@@ -760,6 +766,22 @@
     if (!el) return;
     const mine = msg.sender_id === sessionUser.id;
     await paintMessage(el, msg, mine);
+  }
+
+  async function deleteMessage(id){
+    if (!confirm('Delete this message? This cannot be undone.')) return;
+    const el = document.querySelector(`.msg[data-msg-id="${id}"]`);
+    const btn = el ? el.querySelector('.msg-delete-btn') : null;
+    if (btn) btn.disabled = true;
+
+    const { error } = await supabaseClient.from('messages').delete().eq('id', id);
+    if (error) { console.error(error); alert('Could not delete message: ' + error.message); if (btn) btn.disabled = false; return; }
+    // UI updates itself via the realtime DELETE subscription below.
+  }
+
+  function removeMessageFromUI(id){
+    const el = document.querySelector(`.msg[data-msg-id="${id}"]`);
+    if (el) el.remove();
   }
 
   async function sendMessage(){
@@ -861,6 +883,8 @@
         payload => renderMessage(payload.new))
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages', filter: `project_id=eq.${project.id}` },
         payload => applyMessageUpdate(payload.new))
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'messages' },
+        payload => removeMessageFromUI(payload.old.id))
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'payments', filter: `project_id=eq.${project.id}` },
         payload => { paymentsData.unshift(payload.new); renderPayments(); })
       .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'payments' },

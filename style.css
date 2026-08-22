@@ -272,6 +272,17 @@ body{
 .msg-edit-btn:hover{ color:var(--cyan); background:rgba(55,232,255,.12); }
 .msg.me .msg-edit-btn:hover{ color:#0a0e18; background:rgba(10,14,24,.15); }
 
+.msg-delete-btn{
+  flex-shrink:0; width:18px; height:18px; border-radius:5px; border:none;
+  background:transparent; color:var(--muted-dim); cursor:pointer;
+  display:flex; align-items:center; justify-content:center; transition:.15s; opacity:0;
+}
+.msg:hover .msg-delete-btn{ opacity:1; }
+.msg.me .msg-delete-btn{ color:rgba(10,14,24,.55); }
+.msg-delete-btn:hover{ color:#ff6b6b; background:rgba(255,107,107,.14); }
+.msg.me .msg-delete-btn:hover{ color:#7a0000; background:rgba(10,14,24,.15); }
+.msg-delete-btn:disabled{ opacity:.4; cursor:not-allowed; }
+
 .msg-editor{ display:flex; flex-direction:column; gap:6px; }
 .msg-edit-input{
   width:100%; min-width:180px; resize:vertical; min-height:44px;

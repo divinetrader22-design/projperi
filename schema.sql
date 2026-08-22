@@ -204,6 +204,13 @@ create policy "Senders can edit their own messages"
   using (auth.uid() = sender_id)
   with check (auth.uid() = sender_id);
 
+-- Deleting: the original sender can delete their own message; admins can
+-- delete any message (moderation), same pattern as event log deletion.
+drop policy if exists "Senders and admins can delete messages" on public.messages;
+create policy "Senders and admins can delete messages"
+  on public.messages for delete
+  using (auth.uid() = sender_id or public.is_admin());
+
 -- 5. Payments (client payment history + outstanding balance, shown in sidebar)
 create table if not exists public.payments (
   id bigint generated always as identity primary key,
