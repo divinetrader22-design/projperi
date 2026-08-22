@@ -201,7 +201,47 @@ create policy "Senders can edit their own messages"
   using (auth.uid() = sender_id)
   with check (auth.uid() = sender_id);
 
--- 5. Chat image attachments (Supabase Storage)
+-- 5. Payments (client payment history + outstanding balance, shown in sidebar)
+create table if not exists public.payments (
+  id bigint generated always as identity primary key,
+  project_id uuid not null references public.projects(id) on delete cascade,
+  amount numeric(12,2) not null check (amount > 0),
+  description text not null default '',
+  kind text not null check (kind in ('paid', 'due')),
+  occurred_on date not null default current_date,
+  created_by uuid references auth.users(id) on delete set null,
+  created_at timestamptz not null default now()
+);
+
+alter table public.payments enable row level security;
+
+drop policy if exists "Only project participants can view payments" on public.payments;
+drop policy if exists "Only admins can insert payments" on public.payments;
+drop policy if exists "Only admins can delete payments" on public.payments;
+drop policy if exists "Only admins can update payments" on public.payments;
+
+-- Admins manage payment records; the linked client can only view their own.
+create policy "Only project participants can view payments"
+  on public.payments for select
+  using (
+    public.is_admin()
+    or exists (select 1 from public.projects p where p.id = payments.project_id and p.client_id = auth.uid())
+  );
+
+create policy "Only admins can insert payments"
+  on public.payments for insert
+  with check (public.is_admin());
+
+create policy "Only admins can update payments"
+  on public.payments for update
+  using (public.is_admin())
+  with check (public.is_admin());
+
+create policy "Only admins can delete payments"
+  on public.payments for delete
+  using (public.is_admin());
+
+-- 6. Chat image attachments (Supabase Storage)
 -- One-time manual step (SQL can't create buckets): in Supabase Dashboard ->
 -- Storage -> New bucket -> name it exactly "chat-attachments" -> keep it PRIVATE.
 -- The policies below then restrict who can upload/view files in it, the same
@@ -237,7 +277,7 @@ create policy "Only project participants can upload chat attachments"
     )
   );
 
--- 6. Enable realtime on the tables the dashboard subscribes to
+-- 7. Enable realtime on the tables the dashboard subscribes to
 do $$
 begin
   if not exists (
@@ -259,5 +299,12 @@ begin
     where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'messages'
   ) then
     alter publication supabase_realtime add table public.messages;
+  end if;
+
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'payments'
+  ) then
+    alter publication supabase_realtime add table public.payments;
   end if;
 end $$;
