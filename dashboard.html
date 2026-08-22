@@ -185,9 +185,27 @@
           <div class="payments-balance-value" id="paymentsBalance">$0.00</div>
         </div>
 
+        <div class="payments-wallet">
+          <div class="payments-wallet-label">Send payments to</div>
+          <div class="wallet-display" id="walletDisplay">
+            <div class="wallet-row"><span class="wallet-key">Network</span><span class="wallet-val" id="walletNetworkVal">—</span></div>
+            <div class="wallet-row"><span class="wallet-key">Coin</span><span class="wallet-val" id="walletCoinVal">—</span></div>
+            <div class="wallet-row"><span class="wallet-key">Address</span><span class="wallet-val mono" id="walletAddressVal">—</span>
+              <button class="wallet-copy" id="walletCopyBtn" onclick="copyWalletAddress()" style="display:none;">Copy</button>
+            </div>
+          </div>
+          <div class="wallet-edit" id="walletEdit" style="display:none;">
+            <input type="text" id="walletNetworkInput" placeholder="Network (e.g. Ethereum / ERC20)">
+            <input type="text" id="walletCoinInput" placeholder="Coin (e.g. USDT)">
+            <input type="text" id="walletAddressInput" placeholder="Wallet address">
+            <button class="ctrl-btn primary" onclick="saveWallet()">Save wallet</button>
+          </div>
+        </div>
+
         <div class="payments-admin-add" id="paymentsAddForm" style="display:none;">
           <input type="number" step="0.01" min="0.01" id="paymentAmount" placeholder="Amount">
           <input type="text" id="paymentDesc" placeholder="Description">
+          <input type="date" id="paymentDate">
           <div class="payments-add-row">
             <select id="paymentKind">
               <option value="paid">Payment made</option>
@@ -398,6 +416,7 @@
     const amountInput = document.getElementById('paymentAmount');
     const descInput = document.getElementById('paymentDesc');
     const kindSelect = document.getElementById('paymentKind');
+    const dateInput = document.getElementById('paymentDate');
 
     const amount = parseFloat(amountInput.value);
     if (!amount || amount <= 0) { alert('Enter a valid amount.'); return; }
@@ -407,12 +426,14 @@
       amount: amount,
       description: descInput.value.trim(),
       kind: kindSelect.value,
+      occurred_on: dateInput.value || new Date().toISOString().slice(0, 10),
       created_by: sessionUser.id
     });
     if (error) { console.error(error); alert('Could not add payment: ' + error.message); return; }
 
     amountInput.value = '';
     descInput.value = '';
+    dateInput.value = new Date().toISOString().slice(0, 10);
     // UI updates via realtime INSERT subscription.
   }
 
@@ -421,6 +442,55 @@
     const { error } = await supabaseClient.from('payments').delete().eq('id', id);
     if (error) console.error(error);
     // UI updates via realtime DELETE subscription.
+  }
+
+  // ---------- wallet address (where to send payments) ----------
+  function renderWallet(){
+    const network = project.wallet_network || '';
+    const coin = project.wallet_coin || '';
+    const address = project.wallet_address || '';
+
+    if (currentRole === 'admin') {
+      document.getElementById('walletDisplay').style.display = 'none';
+      document.getElementById('walletEdit').style.display = 'flex';
+      document.getElementById('walletNetworkInput').value = network;
+      document.getElementById('walletCoinInput').value = coin;
+      document.getElementById('walletAddressInput').value = address;
+    } else {
+      document.getElementById('walletDisplay').style.display = 'flex';
+      document.getElementById('walletEdit').style.display = 'none';
+      document.getElementById('walletNetworkVal').textContent = network || 'Not set yet';
+      document.getElementById('walletCoinVal').textContent = coin || '—';
+      document.getElementById('walletAddressVal').textContent = address || '—';
+      document.getElementById('walletCopyBtn').style.display = address ? 'inline-flex' : 'none';
+    }
+  }
+
+  async function saveWallet(){
+    if (currentRole !== 'admin' || !project) return;
+    const network = document.getElementById('walletNetworkInput').value.trim();
+    const coin = document.getElementById('walletCoinInput').value.trim();
+    const address = document.getElementById('walletAddressInput').value.trim();
+
+    const { error } = await supabaseClient.from('projects')
+      .update({ wallet_network: network, wallet_coin: coin, wallet_address: address })
+      .eq('id', project.id);
+    if (error) { console.error(error); alert('Could not save wallet: ' + error.message); return; }
+
+    project.wallet_network = network;
+    project.wallet_coin = coin;
+    project.wallet_address = address;
+  }
+
+  function copyWalletAddress(){
+    const address = document.getElementById('walletAddressVal').textContent;
+    if (!address || address === '—') return;
+    navigator.clipboard.writeText(address).then(() => {
+      const btn = document.getElementById('walletCopyBtn');
+      const original = btn.textContent;
+      btn.textContent = 'Copied!';
+      setTimeout(() => { btn.textContent = original; }, 1500);
+    });
   }
 
   function render(progress){
@@ -666,12 +736,15 @@
       .order('occurred_on', { ascending: false }).order('created_at', { ascending: false });
     paymentsData = payments || [];
     renderPayments();
+    renderWallet();
+    const paymentDateInput = document.getElementById('paymentDate');
+    if (paymentDateInput) paymentDateInput.value = new Date().toISOString().slice(0, 10);
 
     // ---------- realtime: progress + event log + chat, all live ----------
     supabaseClient
       .channel('project-' + project.id)
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'projects', filter: `id=eq.${project.id}` },
-        payload => { project = payload.new; render(project.progress); })
+        payload => { project = payload.new; render(project.progress); renderWallet(); })
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'event_log', filter: `project_id=eq.${project.id}` },
         payload => addLog(payload.new.message, fmtTime(payload.new.created_at), true, payload.new.id))
       .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'event_log' },

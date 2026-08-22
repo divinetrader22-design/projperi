@@ -188,9 +188,35 @@
   padding:8px 10px; color:var(--text); font-size:12.5px; font-family:'Space Grotesk'; outline:none; width:100%;
 }
 .payments-admin-add input:focus, .payments-admin-add select:focus{ border-color:var(--cyan); }
+.payments-admin-add input[type="date"]{ font-family:'JetBrains Mono', monospace; font-size:11.5px; color-scheme:dark; }
 .payments-add-row{ display:flex; gap:8px; }
 .payments-add-row select{ flex:1; }
 .payments-add-row .ctrl-btn{ flex-shrink:0; padding:8px 14px; font-size:11.5px; }
+
+.payments-wallet{
+  margin-bottom:14px; padding-bottom:14px; border-bottom:1px solid var(--line-soft);
+}
+.payments-wallet-label{
+  font-family:'JetBrains Mono', monospace; font-size:9.5px; letter-spacing:.12em;
+  text-transform:uppercase; color:var(--muted-dim); margin-bottom:8px;
+}
+.wallet-display{ display:flex; flex-direction:column; gap:6px; }
+.wallet-row{ display:flex; align-items:center; gap:8px; font-size:12px; }
+.wallet-key{ color:var(--muted-dim); font-family:'JetBrains Mono', monospace; font-size:10px; text-transform:uppercase; letter-spacing:.06em; width:56px; flex-shrink:0; }
+.wallet-val{ color:var(--text); word-break:break-all; }
+.wallet-val.mono{ font-family:'JetBrains Mono', monospace; font-size:11px; }
+.wallet-copy{
+  background:var(--void); border:1px solid var(--line); color:var(--cyan);
+  font-family:'JetBrains Mono', monospace; font-size:10px; padding:3px 8px;
+  border-radius:6px; cursor:pointer; flex-shrink:0; margin-left:auto; transition:.15s;
+}
+.wallet-copy:hover{ border-color:var(--cyan); background:rgba(90,225,255,.08); }
+.wallet-edit{ display:flex; flex-direction:column; gap:8px; }
+.wallet-edit input{
+  background:var(--void); border:1px solid var(--line); border-radius:7px;
+  padding:8px 10px; color:var(--text); font-size:12px; font-family:'Space Grotesk'; outline:none; width:100%;
+}
+.wallet-edit input:focus{ border-color:var(--cyan); }
 
 .payments-list{ display:flex; flex-direction:column; gap:8px; max-height:260px; overflow-y:auto; }
 .payments-list::-webkit-scrollbar{ width:4px; }

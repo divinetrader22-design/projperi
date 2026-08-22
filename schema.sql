@@ -92,6 +92,9 @@ create table if not exists public.projects (
 );
 
 alter table public.projects add column if not exists client_id uuid references auth.users(id);
+alter table public.projects add column if not exists wallet_network text;
+alter table public.projects add column if not exists wallet_coin text;
+alter table public.projects add column if not exists wallet_address text;
 
 alter table public.projects enable row level security;
 
