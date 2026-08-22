@@ -263,6 +263,14 @@
 }
 .payment-row-main{ flex:1; min-width:0; }
 .payment-desc{ font-size:12px; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.payment-desc.panning{ text-overflow:clip; -webkit-mask-image:linear-gradient(90deg, #000 88%, transparent); mask-image:linear-gradient(90deg, #000 88%, transparent); }
+.payment-desc-inner{ display:inline-block; }
+.payment-desc.panning .payment-desc-inner{ animation:pan-text 6s ease-in-out infinite; }
+@keyframes pan-text{
+  0%, 12%{ transform:translateX(0); }
+  45%, 55%{ transform:translateX(var(--pan-dist, 0)); }
+  88%, 100%{ transform:translateX(0); }
+}
 .payment-date{ font-family:'JetBrains Mono', monospace; font-size:9.5px; color:var(--muted-dim); margin-top:2px; }
 .payment-amount{ font-family:'JetBrains Mono', monospace; font-size:12.5px; font-weight:600; flex-shrink:0; }
 .payment-row.paid .payment-amount{ color:var(--green); }

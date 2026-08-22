@@ -416,16 +416,44 @@
              <svg width="10" height="10" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>
            </button>`
         : '';
+      const descText = (p.description || (p.kind === 'paid' ? 'Payment received' : 'Amount due')).replace(/</g,'&lt;');
       return `<div class="payment-row ${p.kind}">
         <div class="payment-row-main">
-          <div class="payment-desc">${(p.description || (p.kind === 'paid' ? 'Payment received' : 'Amount due')).replace(/</g,'&lt;')}</div>
+          <div class="payment-desc"><span class="payment-desc-inner">${descText}</span></div>
           <div class="payment-date">${dateStr}</div>
         </div>
         <div class="payment-amount">${p.kind === 'paid' ? '+' : '−'}${fmtMoney(p.amount)}</div>
         ${removeBtn}
       </div>`;
     }).join('');
+
+    applyTextPanning(list);
   }
+
+  // Auto-pans (scrolls back and forth) any truncated text inside `scope` so
+  // the full content is readable without needing to widen the layout —
+  // most noticeable on narrow/mobile widths where text gets squished.
+  function applyTextPanning(scope){
+    (scope || document).querySelectorAll('.payment-desc').forEach(container => {
+      const inner = container.querySelector('.payment-desc-inner');
+      if (!inner) return;
+      const overflow = inner.scrollWidth - container.clientWidth;
+      if (overflow > 4) {
+        container.classList.add('panning');
+        inner.style.setProperty('--pan-dist', (-overflow - 6) + 'px');
+      } else {
+        container.classList.remove('panning');
+        inner.style.removeProperty('--pan-dist');
+      }
+    });
+  }
+
+  let panResizeTimer = null;
+  window.addEventListener('resize', () => {
+    clearTimeout(panResizeTimer);
+    panResizeTimer = setTimeout(() => applyTextPanning(document.getElementById('paymentsList')), 200);
+  });
+
 
   // Groups outstanding "due" entries by settle_by date, then applies paid
   // amounts FIFO: earliest settle date gets paid off first, and later dates
