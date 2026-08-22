@@ -212,9 +212,12 @@ create table if not exists public.payments (
   description text not null default '',
   kind text not null check (kind in ('paid', 'due')),
   occurred_on date not null default current_date,
+  settle_by date,
   created_by uuid references auth.users(id) on delete set null,
   created_at timestamptz not null default now()
 );
+
+alter table public.payments add column if not exists settle_by date;
 
 alter table public.payments enable row level security;
 

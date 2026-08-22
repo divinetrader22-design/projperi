@@ -179,6 +179,26 @@
 .payments-balance-value.owing{ color:var(--amber); text-shadow:0 0 14px rgba(255,184,77,.3); }
 .payments-balance-value.clear{ color:var(--green); text-shadow:0 0 14px rgba(67,245,165,.3); }
 
+.payments-settle{
+  margin-bottom:14px; padding-bottom:14px; border-bottom:1px solid var(--line-soft);
+}
+.payments-settle-label{
+  font-family:'JetBrains Mono', monospace; font-size:9.5px; letter-spacing:.12em;
+  text-transform:uppercase; color:var(--muted-dim); margin-bottom:8px; text-align:center;
+}
+.settle-list{ display:flex; flex-direction:column; gap:6px; }
+.settle-row{
+  display:flex; align-items:center; justify-content:space-between; gap:8px;
+  padding:8px 10px; border-radius:7px; border:1px solid rgba(255,184,77,.25); background:rgba(255,184,77,.06);
+}
+.settle-date{ font-family:'JetBrains Mono', monospace; font-size:11px; color:var(--text); }
+.settle-amount{ font-family:'JetBrains Mono', monospace; font-size:12px; font-weight:600; color:var(--amber); }
+
+.payments-field-label{
+  font-family:'JetBrains Mono', monospace; font-size:9px; letter-spacing:.05em;
+  text-transform:uppercase; color:var(--muted-dim); margin-top:-2px;
+}
+
 .payments-admin-add{
   display:flex; flex-direction:column; gap:8px; margin-bottom:14px;
   padding-bottom:14px; border-bottom:1px solid var(--line-soft);

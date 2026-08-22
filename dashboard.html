@@ -185,6 +185,11 @@
           <div class="payments-balance-value" id="paymentsBalance">$0.00</div>
         </div>
 
+        <div class="payments-settle" id="paymentsSettle" style="display:none;">
+          <div class="payments-settle-label">To be settled</div>
+          <div class="settle-list" id="settleList"></div>
+        </div>
+
         <div class="payments-wallet">
           <div class="payments-wallet-label">Send payments to</div>
           <div class="wallet-display" id="walletDisplay">
@@ -205,7 +210,10 @@
         <div class="payments-admin-add" id="paymentsAddForm" style="display:none;">
           <input type="number" step="0.01" min="0.01" id="paymentAmount" placeholder="Amount">
           <input type="text" id="paymentDesc" placeholder="Description">
-          <input type="date" id="paymentDate">
+          <label class="payments-field-label">Date recorded</label>
+          <input type="date" id="paymentDate" title="Date recorded (backdate if posting a backlog)">
+          <label class="payments-field-label">Settle by (only for "Amount due")</label>
+          <input type="date" id="paymentSettleBy" title="Settle by (only applies to 'Amount due')">
           <div class="payments-add-row">
             <select id="paymentKind">
               <option value="paid">Payment made</option>
@@ -388,6 +396,8 @@
     balanceEl.textContent = fmtMoney(outstanding);
     balanceEl.className = 'payments-balance-value ' + (outstanding > 0 ? 'owing' : 'clear');
 
+    renderSettleSchedule();
+
     if (!paymentsData.length) {
       list.innerHTML = '<div class="payments-empty">No payment records yet.</div>';
       return;
@@ -411,12 +421,43 @@
     }).join('');
   }
 
+  // Groups outstanding "due" entries by settle_by date. One date -> single
+  // summary line. Multiple distinct dates -> a list, one row per date.
+  function renderSettleSchedule(){
+    const wrap = document.getElementById('paymentsSettle');
+    const listEl = document.getElementById('settleList');
+    if (!wrap || !listEl) return;
+
+    const dueWithDates = paymentsData.filter(p => p.kind === 'due' && p.settle_by);
+    if (!dueWithDates.length) {
+      wrap.style.display = 'none';
+      listEl.innerHTML = '';
+      return;
+    }
+
+    const byDate = {};
+    dueWithDates.forEach(p => {
+      byDate[p.settle_by] = (byDate[p.settle_by] || 0) + Number(p.amount);
+    });
+    const dates = Object.keys(byDate).sort();
+
+    wrap.style.display = 'block';
+    listEl.innerHTML = dates.map(d => {
+      const dateStr = new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+      return `<div class="settle-row">
+        <span class="settle-date">${dateStr}</span>
+        <span class="settle-amount">${fmtMoney(byDate[d])}</span>
+      </div>`;
+    }).join('');
+  }
+
   async function addPayment(){
     if (currentRole !== 'admin' || !project) return;
     const amountInput = document.getElementById('paymentAmount');
     const descInput = document.getElementById('paymentDesc');
     const kindSelect = document.getElementById('paymentKind');
     const dateInput = document.getElementById('paymentDate');
+    const settleByInput = document.getElementById('paymentSettleBy');
 
     const amount = parseFloat(amountInput.value);
     if (!amount || amount <= 0) { alert('Enter a valid amount.'); return; }
@@ -427,6 +468,7 @@
       description: descInput.value.trim(),
       kind: kindSelect.value,
       occurred_on: dateInput.value || new Date().toISOString().slice(0, 10),
+      settle_by: kindSelect.value === 'due' ? (settleByInput.value || null) : null,
       created_by: sessionUser.id
     });
     if (error) { console.error(error); alert('Could not add payment: ' + error.message); return; }
@@ -434,6 +476,7 @@
     amountInput.value = '';
     descInput.value = '';
     dateInput.value = new Date().toISOString().slice(0, 10);
+    settleByInput.value = '';
     // UI updates via realtime INSERT subscription.
   }
 
