@@ -1,4 +1,4 @@
-﻿-- ============================================================
+-- ============================================================
 -- Provada database schema
 -- Run this in Supabase Dashboard -> SQL Editor -> New query.
 -- Safe to re-run any time (uses IF NOT EXISTS / DROP POLICY IF EXISTS).
