@@ -251,6 +251,14 @@ body{
 }
 .chat-body::-webkit-scrollbar{ width:5px; }
 .chat-body::-webkit-scrollbar-thumb{ background:var(--line); border-radius:10px; }
+.chat-older{
+  align-self:center; flex-shrink:0; border:1px solid var(--line); border-radius:7px;
+  background:var(--void); color:var(--cyan); padding:6px 10px;
+  font-family:'JetBrains Mono', monospace; font-size:10px; cursor:pointer;
+}
+.chat-older:hover{ border-color:var(--cyan); }
+.chat-older:disabled{ opacity:.6; cursor:wait; }
+.chat-older[hidden]{ display:none; }
 
 .msg{ max-width:78%; font-size:13.5px; line-height:1.45; padding:10px 13px; border-radius:12px; position:relative; }
 .msg.them{ align-self:flex-start; background:var(--void); border:1px solid var(--line); border-bottom-left-radius:3px; }
@@ -325,6 +333,7 @@ body{
   display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0;
 }
 .chat-send{ background:var(--grad); }
+.chat-send:disabled{ opacity:.55; cursor:wait; }
 .chat-send svg{ width:16px; height:16px; }
 .chat-attach{ background:var(--void); border:1px solid var(--line); color:var(--muted); }
 .chat-attach:hover{ color:var(--cyan); border-color:var(--cyan); }

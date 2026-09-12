@@ -166,6 +166,10 @@ alter table public.messages alter column content set not null;
 alter table public.messages add column if not exists attachment_path text;
 alter table public.messages add column if not exists edited_at timestamptz;
 
+-- Supports the newest-first chat view and cursor-based older-message pages.
+create index if not exists messages_project_id_id_idx
+  on public.messages (project_id, id desc);
+
 alter table public.messages enable row level security;
 
 drop policy if exists "Authenticated users can view messages" on public.messages;
