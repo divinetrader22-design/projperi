@@ -232,6 +232,29 @@
         <div class="payments-list" id="paymentsList"></div>
       </div>
 
+      <div class="panel client-wallet-panel">
+        <span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span>
+        <div class="panel-head"><span class="panel-title">Client Wallet</span></div>
+        <p class="panel-helper">Address provided by the client for this project.</p>
+        <div id="clientWalletRead" class="wallet-display" style="display:none;">
+          <div class="wallet-row"><span class="wallet-key">Network</span><span class="wallet-val" id="clientWalletNetworkVal">—</span></div>
+          <div class="wallet-row"><span class="wallet-key">Address</span><span class="wallet-val mono" id="clientWalletAddressVal">—</span></div>
+        </div>
+        <form id="clientWalletForm" class="client-wallet-form" style="display:none;" onsubmit="saveClientWallet(event)">
+          <label for="clientWalletNetwork">Network</label>
+          <select id="clientWalletNetwork" required>
+            <option value="">Select network</option>
+            <option value="BTC">BTC</option>
+            <option value="ETH">ETH</option>
+            <option value="SOL">SOL</option>
+          </select>
+          <label for="clientWalletAddress">Wallet address</label>
+          <input type="text" id="clientWalletAddress" maxlength="255" autocomplete="off" required placeholder="Enter your wallet address">
+          <button type="submit" class="ctrl-btn primary" id="clientWalletSave">Save wallet address</button>
+        </form>
+        <p class="form-status" id="clientWalletStatus" role="status"></p>
+      </div>
+
       <div class="panel">
         <span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span>
         <div class="panel-head">
@@ -241,6 +264,25 @@
         <canvas id="arcadeCanvas" width="246" height="150" class="arcade-canvas"></canvas>
       </div>
     </div>
+  </div>
+
+  <div class="panel client-notes-panel">
+    <span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span>
+    <div class="panel-head">
+      <span class="panel-title">Client Notes</span>
+      <button type="button" class="ctrl-btn" id="addClientNoteBtn" style="display:none;" onclick="startClientNote()">Add note</button>
+    </div>
+    <div class="client-note-editor" id="clientNoteEditor" style="display:none;">
+      <label for="clientNoteTitle">Header</label>
+      <input id="clientNoteTitle" type="text" maxlength="120" placeholder="Note header">
+      <label for="clientNoteBody">Body</label>
+      <textarea id="clientNoteBody" maxlength="4000" rows="5" placeholder="Write a note for this client"></textarea>
+      <div class="client-note-actions">
+        <button type="button" class="ctrl-btn primary" id="saveClientNoteBtn" onclick="saveClientNote()">Save note</button>
+        <button type="button" class="ctrl-btn" onclick="cancelClientNote()">Cancel</button>
+      </div>
+    </div>
+    <div class="client-note-list" id="clientNoteList"><p class="panel-helper">Loading notes…</p></div>
   </div>
 
   <!-- session info strip -->
@@ -296,6 +338,9 @@
   let currentRole = 'client';
   let project = null;
   let paymentsData = [];
+  let clientWallet = null;
+  let clientNotes = [];
+  let editingClientNoteId = null;
   const MESSAGE_PAGE_SIZE = 50;
   const MESSAGE_COLUMNS = 'id,project_id,sender_id,sender_role,content,attachment_path,created_at,edited_at';
   let oldestLoadedMessageId = null;
@@ -645,6 +690,166 @@
       btn.textContent = 'Copied!';
       setTimeout(() => { btn.textContent = original; }, 1500);
     });
+  }
+
+  function renderClientWallet(){
+    const isClient = currentRole === 'client';
+    document.getElementById('clientWalletForm').style.display = isClient ? 'flex' : 'none';
+    document.getElementById('clientWalletRead').style.display = isClient ? 'none' : 'flex';
+    if (isClient) {
+      document.getElementById('clientWalletNetwork').value = clientWallet?.network || '';
+      document.getElementById('clientWalletAddress').value = clientWallet?.address || '';
+    } else {
+      document.getElementById('clientWalletNetworkVal').textContent = clientWallet?.network || 'Not set yet';
+      document.getElementById('clientWalletAddressVal').textContent = clientWallet?.address || '—';
+    }
+  }
+
+  async function loadClientWallet(){
+    const { data, error } = await supabaseClient.from('client_wallets')
+      .select('project_id,network,address').eq('project_id', project.id).maybeSingle();
+    if (error) {
+      console.error('Could not load client wallet:', error);
+      document.getElementById('clientWalletStatus').textContent = 'Could not load the client wallet.';
+      return;
+    }
+    clientWallet = data;
+    renderClientWallet();
+  }
+
+  async function saveClientWallet(event){
+    event.preventDefault();
+    if (currentRole !== 'client' || !project) return;
+    const network = document.getElementById('clientWalletNetwork').value;
+    const address = document.getElementById('clientWalletAddress').value.trim();
+    if (!['BTC', 'ETH', 'SOL'].includes(network) || !address || address.length > 255) return;
+    const button = document.getElementById('clientWalletSave');
+    const status = document.getElementById('clientWalletStatus');
+    button.disabled = true;
+    status.textContent = 'Saving…';
+    try {
+      const { data, error } = await supabaseClient.from('client_wallets')
+        .upsert({ project_id: project.id, network, address, updated_at: new Date().toISOString() }, { onConflict: 'project_id' })
+        .select('project_id,network,address').single();
+      if (error) throw error;
+      clientWallet = data;
+      status.textContent = 'Wallet saved.';
+    } catch (error) {
+      console.error('Could not save client wallet:', error);
+      status.textContent = 'Could not save wallet: ' + error.message;
+    } finally {
+      button.disabled = false;
+    }
+  }
+
+  function renderClientNotes(){
+    const list = document.getElementById('clientNoteList');
+    list.replaceChildren();
+    if (!clientNotes.length) {
+      const empty = document.createElement('p');
+      empty.className = 'panel-helper';
+      empty.textContent = 'No notes yet.';
+      list.appendChild(empty);
+      return;
+    }
+    for (const note of clientNotes) {
+      const card = document.createElement('article');
+      card.className = 'client-note-card';
+      const header = document.createElement('div');
+      header.className = 'client-note-heading';
+      const title = document.createElement('h3');
+      title.textContent = note.title;
+      header.appendChild(title);
+      if (currentRole === 'admin') {
+        const actions = document.createElement('div');
+        actions.className = 'client-note-actions';
+        for (const [label, action] of [['Edit', () => startClientNote(note.id)], ['Delete', () => deleteClientNote(note.id)]]) {
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.className = 'client-note-action';
+          button.textContent = label;
+          button.addEventListener('click', action);
+          actions.appendChild(button);
+        }
+        header.appendChild(actions);
+      }
+      const body = document.createElement('p');
+      body.className = 'client-note-body';
+      body.textContent = note.body;
+      const time = document.createElement('small');
+      time.className = 'client-note-time';
+      time.textContent = 'Updated ' + fmtTime(note.updated_at);
+      card.append(header, body, time);
+      list.appendChild(card);
+    }
+  }
+
+  async function loadClientNotes(){
+    const { data, error } = await supabaseClient.from('client_notes')
+      .select('id,project_id,title,body,updated_at').eq('project_id', project.id)
+      .order('created_at', { ascending: false }).order('id', { ascending: false });
+    if (error) {
+      console.error('Could not load client notes:', error);
+      document.getElementById('clientNoteList').textContent = 'Could not load notes.';
+      return;
+    }
+    clientNotes = data || [];
+    renderClientNotes();
+  }
+
+  function startClientNote(id = null){
+    if (currentRole !== 'admin') return;
+    const note = id == null ? null : clientNotes.find(item => String(item.id) === String(id));
+    if (id != null && !note) return;
+    editingClientNoteId = note?.id ?? null;
+    document.getElementById('clientNoteTitle').value = note?.title || '';
+    document.getElementById('clientNoteBody').value = note?.body || '';
+    document.getElementById('clientNoteEditor').style.display = 'flex';
+    document.getElementById('clientNoteTitle').focus();
+  }
+
+  function cancelClientNote(){
+    editingClientNoteId = null;
+    document.getElementById('clientNoteEditor').style.display = 'none';
+  }
+
+  async function saveClientNote(){
+    if (currentRole !== 'admin' || !project) return;
+    const title = document.getElementById('clientNoteTitle').value.trim();
+    const body = document.getElementById('clientNoteBody').value.trim();
+    if (!title || !body) { alert('Enter a header and body for the note.'); return; }
+    const button = document.getElementById('saveClientNoteBtn');
+    button.disabled = true;
+    try {
+      let query;
+      if (editingClientNoteId == null) {
+        query = supabaseClient.from('client_notes').insert({ project_id: project.id, title, body });
+      } else {
+        query = supabaseClient.from('client_notes')
+          .update({ title, body, updated_at: new Date().toISOString() })
+          .eq('id', editingClientNoteId).eq('project_id', project.id);
+      }
+      const { error } = await query.select('id').single();
+      if (error) throw error;
+      cancelClientNote();
+      await loadClientNotes();
+    } catch (error) {
+      console.error('Could not save client note:', error);
+      alert('Could not save note: ' + error.message);
+    } finally {
+      button.disabled = false;
+    }
+  }
+
+  async function deleteClientNote(id){
+    if (currentRole !== 'admin' || !project || !confirm('Delete this note?')) return;
+    const { data, error } = await supabaseClient.from('client_notes').delete()
+      .eq('id', id).eq('project_id', project.id).select('id');
+    if (error || !data?.length) {
+      alert('Could not delete note: ' + (error?.message || 'Note not found.'));
+      return;
+    }
+    await loadClientNotes();
   }
 
   function render(progress){
@@ -998,6 +1203,7 @@
     document.getElementById('roleBadge').textContent = currentRole === 'admin' ? 'ADMIN ACCESS' : 'CLIENT ACCESS';
     document.getElementById('adminControls').style.display = currentRole === 'admin' ? 'flex' : 'none';
     document.getElementById('paymentsAddForm').style.display = currentRole === 'admin' ? 'flex' : 'none';
+    document.getElementById('addClientNoteBtn').style.display = currentRole === 'admin' ? 'inline-flex' : 'none';
     document.getElementById('chatTitle').textContent = currentRole === 'admin' ? (cfg.clientName || 'Client') : 'Pazovado Support';
     document.getElementById('chatAvatar').textContent = currentRole === 'admin' ? 'CL' : 'PZ';
 
@@ -1024,6 +1230,7 @@
     paymentsData = payments || [];
     renderPayments();
     renderWallet();
+    await Promise.all([loadClientWallet(), loadClientNotes()]);
     const todayStr = new Date().toISOString().slice(0, 10);
     const paidDateInput = document.getElementById('paidDate');
     const dueDateInput = document.getElementById('dueDate');
@@ -1049,15 +1256,33 @@
         payload => { paymentsData.unshift(payload.new); renderPayments(); })
       .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'payments' },
         payload => { paymentsData = paymentsData.filter(p => p.id !== payload.old.id); renderPayments(); })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'client_wallets', filter: `project_id=eq.${project.id}` },
+        () => loadClientWallet())
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'client_wallets', filter: `project_id=eq.${project.id}` },
+        () => loadClientWallet())
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'client_notes', filter: `project_id=eq.${project.id}` },
+        () => loadClientNotes())
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'client_notes', filter: `project_id=eq.${project.id}` },
+        () => loadClientNotes())
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'client_notes' },
+        () => loadClientNotes())
       .subscribe(status => {
         // On first connect and after a reconnect, recover any events missed
         // while the socket was down. Existing rows are deduplicated by id.
-        if (status === 'SUBSCRIBED') loadRecentMessages();
+        if (status === 'SUBSCRIBED') {
+          loadRecentMessages();
+          loadClientWallet();
+          loadClientNotes();
+        }
       });
 
     // A backgrounded tab can miss events while its connection is suspended.
     document.addEventListener('visibilitychange', () => {
-      if (!document.hidden && project) loadRecentMessages();
+      if (!document.hidden && project) {
+        loadRecentMessages();
+        loadClientWallet();
+        loadClientNotes();
+      }
     });
 
     // ---------- presence: real online/offline status ----------
