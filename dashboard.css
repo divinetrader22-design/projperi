@@ -252,6 +252,39 @@
 }
 .wallet-edit input:focus{ border-color:var(--cyan); }
 
+/* ---------- client-owned wallet and project notes ---------- */
+.panel-helper{ margin:0 0 12px; color:var(--muted); font-size:12px; line-height:1.5; }
+.client-wallet-form, .client-note-editor{ display:flex; flex-direction:column; gap:8px; }
+.client-wallet-form label, .client-note-editor label{
+  color:var(--muted); font:10px 'JetBrains Mono', monospace; text-transform:uppercase; letter-spacing:.08em;
+}
+.client-wallet-form input, .client-wallet-form select, .client-note-editor input, .client-note-editor textarea{
+  width:100%; padding:9px 10px; border:1px solid var(--line); border-radius:7px;
+  background:var(--void); color:var(--text); font:12px 'Space Grotesk', sans-serif;
+  outline:none;
+}
+.client-wallet-form input:focus, .client-wallet-form select:focus,
+.client-note-editor input:focus, .client-note-editor textarea:focus{ border-color:var(--cyan); }
+.client-wallet-form select{ color-scheme:dark; }
+.client-wallet-form .ctrl-btn{ margin-top:6px; }
+.client-wallet-form .ctrl-btn:disabled, .client-note-actions .ctrl-btn:disabled{ opacity:.55; cursor:wait; }
+.form-status{ margin:9px 0 0; min-height:16px; color:var(--muted); font-size:11px; line-height:1.4; }
+.client-notes-panel{ margin-top:20px; }
+.client-note-editor{ max-width:760px; margin:0 0 18px; }
+.client-note-editor textarea{ min-height:115px; resize:vertical; line-height:1.5; }
+.client-note-actions{ display:flex; align-items:center; gap:8px; }
+.client-note-list{ display:grid; grid-template-columns:repeat(auto-fit, minmax(250px, 1fr)); gap:12px; }
+.client-note-card{
+  min-width:0; padding:14px 16px; border:1px solid var(--line-soft); border-radius:9px;
+  background:rgba(255,255,255,.02);
+}
+.client-note-heading{ display:flex; align-items:start; justify-content:space-between; gap:12px; }
+.client-note-heading h3{ margin:0; font-size:14px; color:var(--cyan); overflow-wrap:anywhere; }
+.client-note-body{ margin:10px 0; font-size:13px; line-height:1.55; white-space:pre-wrap; overflow-wrap:anywhere; }
+.client-note-time{ color:var(--muted-dim); font:10px 'JetBrains Mono', monospace; }
+.client-note-action{ border:0; background:none; color:var(--muted); cursor:pointer; font-size:11px; padding:2px; }
+.client-note-action:hover{ color:var(--cyan); }
+
 .payments-list{ display:flex; flex-direction:column; gap:8px; max-height:260px; overflow-y:auto; }
 .payments-list::-webkit-scrollbar{ width:4px; }
 .payments-list::-webkit-scrollbar-thumb{ background:var(--line); border-radius:10px; }
