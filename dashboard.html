@@ -303,6 +303,18 @@
   let loadingOlderMessages = false;
   let loadingRecentMessages = false;
   let sendingMessage = false;
+  let stickChatToBottom = true;
+
+  const chatBody = document.getElementById('chatBody');
+  chatBody.addEventListener('scroll', () => {
+    if (!loadingOlderMessages) {
+      stickChatToBottom = chatBody.scrollHeight - chatBody.scrollTop - chatBody.clientHeight < 32;
+    }
+  });
+
+  function scrollChatToBottom(){
+    chatBody.scrollTop = chatBody.scrollHeight;
+  }
 
   const stages = [
     {at:0,  label:'Initiated'},
@@ -723,7 +735,7 @@
       .find(item => Number(item.dataset.msgId) > Number(msg.id));
     body.insertBefore(el, next || null);
     await paintMessage(el, msg, mine);
-    if (body.lastElementChild === el) body.scrollTop = body.scrollHeight;
+    if (stickChatToBottom && body.lastElementChild === el) scrollChatToBottom();
   }
 
   function updateOlderButton(){
@@ -758,6 +770,7 @@
 
   async function loadOlderMessages(){
     if (loadingOlderMessages || !hasOlderMessages || oldestLoadedMessageId === null) return;
+    stickChatToBottom = false;
     loadingOlderMessages = true;
     updateOlderButton();
     const body = document.getElementById('chatBody');
@@ -811,6 +824,11 @@
       `${mediaHtml}${textHtml}` +
       `<div class="msg-foot"><span class="msg-time">${fmtTime(msg.created_at)}${editedTag ? ' ' + editedTag : ''}</span>${editBtn}${deleteBtn}</div>`;
     el._msgData = msg;
+    // Image decoding may finish after the row was inserted into a long thread.
+    // Keep the newest message in view unless the user has scrolled up themselves.
+    el.querySelectorAll('.chat-img').forEach(img => img.addEventListener('load', () => {
+      if (stickChatToBottom && !loadingOlderMessages) scrollChatToBottom();
+    }));
   }
 
   function startEditMessage(id){
@@ -891,6 +909,21 @@
     if (el) el.remove();
   }
 
+  async function handleMessageDelete(id){
+    if (id == null || !project) return;
+    const el = document.querySelector(`.msg[data-msg-id="${id}"]`);
+    if (!el) return;
+
+    // DELETE events do not carry a project filter with the current replication
+    // settings. Do not remove a visible bubble unless our project-specific
+    // SELECT confirms that the saved row is actually gone.
+    const { data, error } = await supabaseClient.from('messages').select('id')
+      .eq('project_id', project.id).eq('id', id).maybeSingle();
+    if (error) { console.error('Could not verify message deletion:', error); return; }
+    if (data) { console.warn('Ignored DELETE event for a message still in this project:', id); return; }
+    removeMessageFromUI(id);
+  }
+
   async function sendMessage(){
     const input = document.getElementById('chatInput');
     const text = input.value.trim();
@@ -921,7 +954,9 @@
       if (error) throw error;
       savedMessage = saved;
       try {
+        stickChatToBottom = true;
         await renderMessage(saved); // Also works while Realtime is disconnected.
+        scrollChatToBottom();
       } catch (renderError) {
         console.error('Message saved but could not be displayed yet:', renderError);
       }
@@ -1009,7 +1044,7 @@
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages', filter: `project_id=eq.${project.id}` },
         payload => applyMessageUpdate(payload.new))
       .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'messages' },
-        payload => removeMessageFromUI(payload.old.id))
+        payload => handleMessageDelete(payload.old?.id))
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'payments', filter: `project_id=eq.${project.id}` },
         payload => { paymentsData.unshift(payload.new); renderPayments(); })
       .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'payments' },
@@ -1019,6 +1054,11 @@
         // while the socket was down. Existing rows are deduplicated by id.
         if (status === 'SUBSCRIBED') loadRecentMessages();
       });
+
+    // A backgrounded tab can miss events while its connection is suspended.
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden && project) loadRecentMessages();
+    });
 
     // ---------- presence: real online/offline status ----------
     // Clients always see the admin/support side marked as available.
