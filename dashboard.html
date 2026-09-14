@@ -266,6 +266,20 @@
     </div>
   </div>
 
+  <div class="panel client-notes-panel" id="withdrawalPanel">
+    <div class="panel-head"><span class="panel-title">Withdrawable Balance</span></div>
+    <div id="withdrawableAmount" style="font-size:28px;color:var(--cyan);margin-bottom:12px;">Loading…</div>
+    <form id="withdrawableAdminForm" class="client-wallet-form" style="display:none;max-width:360px;" onsubmit="saveWithdrawableBalance(event)">
+      <label for="withdrawableInput">Set balance (USD)</label>
+      <input id="withdrawableInput" type="number" min="0" max="999999999999.99" step="0.01" required placeholder="0.00">
+      <button class="ctrl-btn primary" type="submit">Save balance</button>
+    </form>
+    <button id="requestWithdrawalBtn" type="button" class="ctrl-btn primary" style="display:none;" onclick="requestWithdrawal()">Request withdrawal</button>
+    <p id="withdrawalStatus" class="form-status" role="status"></p>
+    <p class="panel-helper">Approval records your request. Payment is handled separately by the admin.</p>
+    <div id="withdrawalHistory" class="client-note-list"></div>
+  </div>
+
   <div class="panel client-notes-panel">
     <span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span>
     <div class="panel-head">
@@ -341,6 +355,10 @@
   let clientWallet = null;
   let clientNotes = [];
   let editingClientNoteId = null;
+  let withdrawalBalance = { amount: 0, version: 0 };
+  let withdrawalRequests = [];
+  let withdrawalBusy = false;
+  let withdrawalLoadVersion = 0;
   const MESSAGE_PAGE_SIZE = 50;
   const MESSAGE_COLUMNS = 'id,project_id,sender_id,sender_role,content,attachment_path,created_at,edited_at';
   let oldestLoadedMessageId = null;
@@ -690,6 +708,113 @@
       btn.textContent = 'Copied!';
       setTimeout(() => { btn.textContent = original; }, 1500);
     });
+  }
+
+  async function loadWithdrawals(){
+    if (!project) return;
+    const version = ++withdrawalLoadVersion;
+    try {
+      const [balance, requests] = await Promise.all([
+        supabaseClient.from('withdrawable_balances').select('amount,version').eq('project_id', project.id).maybeSingle(),
+        supabaseClient.from('withdrawal_requests').select('id,amount,status,requested_at,reviewed_at,wallet_network,wallet_address').eq('project_id', project.id).order('requested_at', { ascending: false }).limit(100)
+      ]);
+      if (version !== withdrawalLoadVersion) return;
+      if (balance.error || requests.error) throw balance.error || requests.error;
+      withdrawalBalance = balance.data || { amount: 0, version: 0 };
+      withdrawalRequests = requests.data || [];
+      renderWithdrawals();
+    } catch (error) {
+      if (version !== withdrawalLoadVersion) return;
+      document.getElementById('withdrawalStatus').textContent = 'Could not load withdrawals: ' + error.message;
+    }
+  }
+
+  function renderWithdrawals(){
+    const pending = withdrawalRequests.find(r => r.status === 'pending');
+    const admin = currentRole === 'admin';
+    document.getElementById('withdrawableAmount').textContent = fmtMoney(withdrawalBalance.amount);
+    document.getElementById('withdrawableAdminForm').style.display = admin ? 'flex' : 'none';
+    document.querySelectorAll('#withdrawableAdminForm input, #withdrawableAdminForm button').forEach(el => el.disabled = withdrawalBusy || !!pending);
+    const requestButton = document.getElementById('requestWithdrawalBtn');
+    requestButton.style.display = admin ? 'none' : 'inline-flex';
+    requestButton.disabled = withdrawalBusy || !!pending || Number(withdrawalBalance.amount) <= 0;
+    requestButton.textContent = pending ? 'Withdrawal pending' : 'Request ' + fmtMoney(withdrawalBalance.amount);
+    document.getElementById('withdrawalStatus').textContent = pending
+      ? (admin ? 'Review the pending request before changing the balance.' : 'Your withdrawal request is awaiting admin review.') : '';
+    const history = document.getElementById('withdrawalHistory');
+    history.replaceChildren();
+    for (const request of withdrawalRequests) {
+      const card = document.createElement('article');
+      card.className = 'client-note-card';
+      const heading = document.createElement('h3');
+      heading.textContent = fmtMoney(request.amount) + ' — ' + request.status[0].toUpperCase() + request.status.slice(1);
+      const date = document.createElement('p');
+      date.className = 'panel-helper';
+      date.textContent = 'Requested ' + new Date(request.requested_at).toLocaleString();
+      card.append(heading, date);
+      if (request.wallet_address) {
+        const wallet = document.createElement('p');
+        wallet.className = 'panel-helper';
+        wallet.style.overflowWrap = 'anywhere';
+        wallet.textContent = 'Wallet at request: ' + request.wallet_network + ' · ' + request.wallet_address;
+        card.appendChild(wallet);
+      }
+      if (admin && request.status === 'pending') {
+        for (const [label, decision] of [['Approve', 'approved'], ['Deny', 'denied']]) {
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.className = 'ctrl-btn';
+          button.disabled = withdrawalBusy;
+          button.textContent = label;
+          button.addEventListener('click', () => reviewWithdrawal(request, decision));
+          card.appendChild(button);
+        }
+      }
+      history.appendChild(card);
+    }
+  }
+
+  async function runWithdrawalAction(name, args, success){
+    if (withdrawalBusy) return;
+    withdrawalBusy = true;
+    renderWithdrawals();
+    try {
+      const { error } = await supabaseClient.rpc(name, args);
+      if (error) throw error;
+      await loadWithdrawals();
+      document.getElementById('withdrawalStatus').textContent = success;
+    } catch (error) {
+      await loadWithdrawals();
+      document.getElementById('withdrawalStatus').textContent = error.message;
+    } finally {
+      const status = document.getElementById('withdrawalStatus').textContent;
+      withdrawalBusy = false;
+      renderWithdrawals();
+      document.getElementById('withdrawalStatus').textContent = status;
+    }
+  }
+
+  async function saveWithdrawableBalance(event){
+    event.preventDefault();
+    if (currentRole !== 'admin' || !project || withdrawalBusy) return;
+    const amount = document.getElementById('withdrawableInput').value;
+    if (!/^\d+(\.\d{1,2})?$/.test(amount)) {
+      document.getElementById('withdrawalStatus').textContent = 'Enter a valid amount with up to two decimal places.'; return;
+    }
+    await runWithdrawalAction('set_withdrawable_balance', { p_project_id: project.id, p_amount: amount, p_version: withdrawalBalance.version }, 'Withdrawable balance saved.');
+  }
+
+  async function requestWithdrawal(){
+    if (currentRole !== 'client' || !project || withdrawalBusy || Number(withdrawalBalance.amount) <= 0) return;
+    const amount = withdrawalBalance.amount;
+    if (!confirm('Request withdrawal of ' + fmtMoney(amount) + '?')) return;
+    await runWithdrawalAction('request_withdrawal', { p_project_id: project.id, p_expected_amount: amount }, 'Withdrawal requested. Waiting for admin approval.');
+  }
+
+  async function reviewWithdrawal(request, decision){
+    if (currentRole !== 'admin' || !project || withdrawalBusy) return;
+    if (!confirm((decision === 'approved' ? 'Approve ' : 'Deny ') + fmtMoney(request.amount) + '?')) return;
+    await runWithdrawalAction('review_withdrawal', { p_request_id: request.id, p_decision: decision }, decision === 'approved' ? 'Withdrawal approved. Balance deducted; payment is handled separately.' : 'Withdrawal denied. Balance remains available.');
   }
 
   function renderClientWallet(){
@@ -1230,7 +1355,7 @@
     paymentsData = payments || [];
     renderPayments();
     renderWallet();
-    await Promise.all([loadClientWallet(), loadClientNotes()]);
+    await Promise.all([loadClientWallet(), loadClientNotes(), loadWithdrawals()]);
     const todayStr = new Date().toISOString().slice(0, 10);
     const paidDateInput = document.getElementById('paidDate');
     const dueDateInput = document.getElementById('dueDate');
@@ -1266,6 +1391,8 @@
         () => loadClientNotes())
       .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'client_notes' },
         () => loadClientNotes())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'withdrawable_balances', filter: `project_id=eq.${project.id}` }, () => loadWithdrawals())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'withdrawal_requests', filter: `project_id=eq.${project.id}` }, () => loadWithdrawals())
       .subscribe(status => {
         // On first connect and after a reconnect, recover any events missed
         // while the socket was down. Existing rows are deduplicated by id.
@@ -1273,6 +1400,7 @@
           loadRecentMessages();
           loadClientWallet();
           loadClientNotes();
+          loadWithdrawals();
         }
       });
 
@@ -1282,6 +1410,7 @@
         loadRecentMessages();
         loadClientWallet();
         loadClientNotes();
+        loadWithdrawals();
       }
     });
 
