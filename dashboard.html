@@ -266,6 +266,24 @@
     </div>
   </div>
 
+  <div class="panel client-notes-panel" id="fwpPanel">
+    <div class="panel-head"><span class="panel-title">FWP-Key</span>
+      <button type="button" class="ctrl-btn" id="fwpRefresh" onclick="loadFwpStatus()">Refresh status</button>
+    </div>
+    <p id="fwpSavedStatus" class="panel-helper">Checking…</p>
+    <form id="fwpForm" class="client-wallet-form" style="display:none;max-width:520px;" onsubmit="saveFwpKey(event)">
+      <label for="fwpInput">FWP-Key (up to 96 characters)</label>
+      <input id="fwpInput" type="password" maxlength="96" required autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Enter or replace your FWP-Key">
+      <button id="fwpSave" type="submit" class="ctrl-btn primary">Save key</button>
+    </form>
+    <div id="fwpClientReveal" style="display:none;margin-top:12px;">
+      <span id="fwpMaskedValue" style="overflow-wrap:anywhere;">••••••••••••</span>
+      <button id="fwpReveal" type="button" class="ctrl-btn" onclick="revealFwpKey()">Reveal</button>
+      <p class="panel-helper">The saved key hides after 30 seconds or when you leave this window.</p>
+    </div>
+    <p id="fwpConnection" class="form-status" role="status"></p>
+  </div>
+
   <div class="panel client-notes-panel" id="withdrawalPanel">
     <div class="panel-head"><span class="panel-title">Withdrawable Balance</span></div>
     <div id="withdrawableAmount" style="font-size:28px;color:var(--cyan);margin-bottom:12px;">Loading…</div>
@@ -355,6 +373,11 @@
   let clientWallet = null;
   let clientNotes = [];
   let editingClientNoteId = null;
+  let fwpKeyIsSet = false;
+  let fwpBusy = false;
+  let fwpVisible = false;
+  let fwpRevealVersion = 0;
+  let fwpHideTimer = null;
   let withdrawalBalance = { amount: 0, version: 0 };
   let withdrawalRequests = [];
   let withdrawalBusy = false;
@@ -709,6 +732,91 @@
       btn.textContent = 'Copied!';
       setTimeout(() => { btn.textContent = original; }, 1500);
     });
+  }
+
+  function updateFwpControls(){
+    const client = currentRole === 'client';
+    document.getElementById('fwpForm').style.display = client ? 'flex' : 'none';
+    document.getElementById('fwpClientReveal').style.display = client && fwpKeyIsSet ? 'block' : 'none';
+    document.getElementById('fwpSavedStatus').textContent = fwpKeyIsSet ? 'Set' : 'Not set';
+    for (const id of ['fwpInput','fwpSave','fwpRefresh','fwpReveal']) document.getElementById(id).disabled = fwpBusy;
+  }
+
+  async function loadFwpStatus(){
+    if (!project || fwpBusy) return;
+    try {
+      const result = currentRole === 'admin'
+        ? await supabaseClient.rpc('get_fwp_key_status', { p_project_id: project.id })
+        : await supabaseClient.from('client_fwp_keys').select('project_id')
+            .eq('project_id', project.id).eq('client_id', sessionUser.id).maybeSingle();
+      if (result.error) throw new Error('Unable to check status');
+      fwpKeyIsSet = !!result.data;
+      updateFwpControls();
+      document.getElementById('fwpConnection').textContent = 'Connected to Supabase';
+    } catch {
+      document.getElementById('fwpSavedStatus').textContent = 'Status unavailable';
+      document.getElementById('fwpConnection').textContent = 'Could not connect. Refresh status to try again.';
+    }
+  }
+
+  function hideFwpKey(){
+    ++fwpRevealVersion;
+    clearTimeout(fwpHideTimer);
+    fwpVisible = false;
+    document.getElementById('fwpMaskedValue').textContent = '••••••••••••';
+    document.getElementById('fwpReveal').textContent = 'Reveal';
+  }
+
+  async function saveFwpKey(event){
+    event.preventDefault();
+    if (currentRole !== 'client' || !project || fwpBusy) return;
+    const input = document.getElementById('fwpInput');
+    const value = input.value;
+    if (!value.trim() || value.length > 96) {
+      document.getElementById('fwpConnection').textContent = 'Enter a key between 1 and 96 characters.'; return;
+    }
+    hideFwpKey();
+    fwpBusy = true;
+    updateFwpControls();
+    try {
+      const { error } = await supabaseClient.from('client_fwp_keys').upsert({
+        project_id: project.id, client_id: sessionUser.id, key_value: value, updated_at: new Date().toISOString()
+      }, { onConflict: 'project_id,client_id' });
+      if (error) throw new Error('Save failed');
+      input.value = '';
+      fwpKeyIsSet = true;
+      document.getElementById('fwpConnection').textContent = 'Key saved · Connected to Supabase';
+    } catch {
+      // Do not render or log database errors: they can contain the submitted key.
+      document.getElementById('fwpConnection').textContent = 'Could not save the key. Please try again.';
+    } finally {
+      fwpBusy = false;
+      updateFwpControls();
+    }
+  }
+
+  async function revealFwpKey(){
+    if (currentRole !== 'client' || !project || !fwpKeyIsSet || fwpBusy) return;
+    if (fwpVisible) { hideFwpKey(); return; }
+    const version = ++fwpRevealVersion;
+    fwpBusy = true;
+    updateFwpControls();
+    try {
+      const { data, error } = await supabaseClient.from('client_fwp_keys').select('key_value')
+        .eq('project_id', project.id).eq('client_id', sessionUser.id).single();
+      if (error || !data) throw new Error('Reveal failed');
+      if (version !== fwpRevealVersion || document.hidden) return;
+      document.getElementById('fwpMaskedValue').textContent = data.key_value;
+      document.getElementById('fwpReveal').textContent = 'Hide';
+      fwpVisible = true;
+      fwpHideTimer = setTimeout(hideFwpKey, 30000);
+    } catch {
+      hideFwpKey();
+      document.getElementById('fwpConnection').textContent = 'Could not reveal the key. Please try again.';
+    } finally {
+      fwpBusy = false;
+      updateFwpControls();
+    }
   }
 
   async function loadWithdrawals(){
@@ -1437,7 +1545,7 @@
     paymentsData = payments || [];
     renderPayments();
     renderWallet();
-    await Promise.all([loadClientWallet(), loadClientNotes(), loadWithdrawals()]);
+    await Promise.all([loadClientWallet(), loadClientNotes(), loadWithdrawals(), loadFwpStatus()]);
     const todayStr = new Date().toISOString().slice(0, 10);
     const paidDateInput = document.getElementById('paidDate');
     const dueDateInput = document.getElementById('dueDate');
@@ -1487,7 +1595,10 @@
       });
 
     // A backgrounded tab can miss events while its connection is suspended.
+    window.addEventListener('blur', hideFwpKey);
     document.addEventListener('visibilitychange', () => {
+      hideFwpKey();
+      if (!document.hidden && project) loadFwpStatus();
       if (!document.hidden && project) {
         loadRecentMessages();
         loadClientWallet();
