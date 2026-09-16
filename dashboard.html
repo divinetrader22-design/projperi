@@ -717,7 +717,7 @@
     try {
       const [balance, requests] = await Promise.all([
         supabaseClient.from('withdrawable_balances').select('amount,version').eq('project_id', project.id).maybeSingle(),
-        supabaseClient.from('withdrawal_requests').select('id,amount,status,requested_at,reviewed_at,wallet_network,wallet_address,progress,progress_updated_at').eq('project_id', project.id).order('requested_at', { ascending: false }).limit(100)
+        supabaseClient.from('withdrawal_requests').select('id,amount,status,requested_at,reviewed_at,wallet_network,wallet_address,progress,progress_updated_at').eq('project_id', project.id).is('deleted_at', null).order('requested_at', { ascending: false }).limit(100)
       ]);
       if (version !== withdrawalLoadVersion) return;
       if (balance.error || requests.error) throw balance.error || requests.error;
@@ -771,6 +771,15 @@
           button.addEventListener('click', () => reviewWithdrawal(request, decision));
           card.appendChild(button);
         }
+      }
+      if (admin) {
+        const remove = document.createElement('button');
+        remove.type = 'button';
+        remove.className = 'ctrl-btn';
+        remove.textContent = 'Delete';
+        remove.disabled = withdrawalBusy;
+        remove.addEventListener('click', () => removeWithdrawal(request));
+        card.appendChild(remove);
       }
       history.appendChild(card);
     }
@@ -836,6 +845,15 @@
     await runWithdrawalAction('set_withdrawal_progress', {
       p_request_id: request.id, p_progress: text, p_expected_progress: request.progress || 0
     }, 'Reported progress updated to ' + Number(text).toFixed(2) + '%.');
+  }
+
+  async function removeWithdrawal(request){
+    if (currentRole !== 'admin' || !project || withdrawalBusy) return;
+    const detail = request.status === 'pending'
+      ? 'This cancels the pending request and lets the client submit again.'
+      : 'This removes it from history without changing the balance.';
+    if (!confirm('Delete this ' + fmtMoney(request.amount) + ' withdrawal request? ' + detail)) return;
+    await runWithdrawalAction('remove_withdrawal_request', { p_request_id: request.id }, 'Withdrawal request removed from history.');
   }
 
   async function runWithdrawalAction(name, args, success){
