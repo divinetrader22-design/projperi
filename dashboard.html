@@ -359,6 +359,7 @@
   let withdrawalRequests = [];
   let withdrawalBusy = false;
   let withdrawalLoadVersion = 0;
+  const withdrawalRenderedProgress = new Map();
   const MESSAGE_PAGE_SIZE = 50;
   const MESSAGE_COLUMNS = 'id,project_id,sender_id,sender_role,content,attachment_path,created_at,edited_at';
   let oldestLoadedMessageId = null;
@@ -716,7 +717,7 @@
     try {
       const [balance, requests] = await Promise.all([
         supabaseClient.from('withdrawable_balances').select('amount,version').eq('project_id', project.id).maybeSingle(),
-        supabaseClient.from('withdrawal_requests').select('id,amount,status,requested_at,reviewed_at,wallet_network,wallet_address').eq('project_id', project.id).order('requested_at', { ascending: false }).limit(100)
+        supabaseClient.from('withdrawal_requests').select('id,amount,status,requested_at,reviewed_at,wallet_network,wallet_address,progress,progress_updated_at').eq('project_id', project.id).order('requested_at', { ascending: false }).limit(100)
       ]);
       if (version !== withdrawalLoadVersion) return;
       if (balance.error || requests.error) throw balance.error || requests.error;
@@ -752,6 +753,7 @@
       date.className = 'panel-helper';
       date.textContent = 'Requested ' + new Date(request.requested_at).toLocaleString();
       card.append(heading, date);
+      if (request.status !== 'denied') card.appendChild(buildWithdrawalProgress(request, admin));
       if (request.wallet_address) {
         const wallet = document.createElement('p');
         wallet.className = 'panel-helper';
@@ -772,6 +774,68 @@
       }
       history.appendChild(card);
     }
+  }
+
+  function buildWithdrawalProgress(request, admin){
+    const value = Number(request.progress || 0);
+    const section = document.createElement('div');
+    section.className = 'withdrawal-progress';
+    const label = document.createElement('div');
+    label.className = 'withdrawal-progress-label';
+    label.textContent = 'Reported progress · ' + value.toFixed(2) + '%';
+    const track = document.createElement('div');
+    track.className = 'withdrawal-progress-track';
+    track.setAttribute('role', 'progressbar');
+    track.setAttribute('aria-label', 'Reported withdrawal progress');
+    track.setAttribute('aria-valuemin', '0');
+    track.setAttribute('aria-valuemax', '100');
+    track.setAttribute('aria-valuenow', String(value));
+    const fill = document.createElement('div');
+    fill.className = 'withdrawal-progress-fill';
+    fill.style.width = (withdrawalRenderedProgress.get(request.id) ?? value) + '%';
+    track.appendChild(fill);
+    section.append(label, track);
+    withdrawalRenderedProgress.set(request.id, value);
+    requestAnimationFrame(() => requestAnimationFrame(() => { fill.style.width = value + '%'; }));
+    if (request.progress_updated_at) {
+      const time = document.createElement('small');
+      time.className = 'panel-helper';
+      time.textContent = 'Updated ' + new Date(request.progress_updated_at).toLocaleString();
+      section.appendChild(time);
+    }
+    if (admin) {
+      const controls = document.createElement('form');
+      controls.className = 'withdrawal-progress-controls';
+      const input = document.createElement('input');
+      input.type = 'number'; input.min = '0'; input.max = '100'; input.step = '0.01';
+      input.value = value.toFixed(2); input.required = true;
+      input.setAttribute('aria-label', 'Set reported progress percentage');
+      input.disabled = withdrawalBusy;
+      const save = document.createElement('button');
+      save.type = 'submit'; save.className = 'ctrl-btn'; save.textContent = 'Set %'; save.disabled = withdrawalBusy;
+      controls.onsubmit = event => { event.preventDefault(); setWithdrawalProgress(request, input.value); };
+      controls.append(input, save);
+      for (const [label, delta] of [['−1%', -1], ['−0.1%', -0.1], ['+0.1%', 0.1], ['+1%', 1]]) {
+        const button = document.createElement('button');
+        button.type = 'button'; button.className = 'ctrl-btn'; button.textContent = label;
+        button.disabled = withdrawalBusy || (delta < 0 ? value === 0 : value === 100);
+        button.onclick = () => setWithdrawalProgress(request, Math.max(0, Math.min(100, Math.round((value + delta) * 100) / 100)).toFixed(2));
+        controls.appendChild(button);
+      }
+      section.appendChild(controls);
+    }
+    return section;
+  }
+
+  async function setWithdrawalProgress(request, value){
+    if (currentRole !== 'admin' || withdrawalBusy || request.status === 'denied') return;
+    const text = String(value);
+    if (!/^\d+(\.\d{1,2})?$/.test(text) || Number(text) > 100) {
+      document.getElementById('withdrawalStatus').textContent = 'Enter a percentage from 0 to 100 with up to two decimal places.'; return;
+    }
+    await runWithdrawalAction('set_withdrawal_progress', {
+      p_request_id: request.id, p_progress: text, p_expected_progress: request.progress || 0
+    }, 'Reported progress updated to ' + Number(text).toFixed(2) + '%.');
   }
 
   async function runWithdrawalAction(name, args, success){
