@@ -2,10 +2,13 @@ begin;
 create table if not exists public.client_fwp_keys (
  project_id uuid not null references public.projects(id) on delete cascade,
  client_id uuid not null references auth.users(id) on delete cascade,
- key_value text not null check(char_length(key_value) between 1 and 96 and char_length(btrim(key_value)) > 0),
+ key_value text not null check(char_length(key_value) between 1 and 98 and char_length(btrim(key_value)) > 0),
  updated_at timestamptz not null default now(),
  primary key(project_id,client_id)
 );
+alter table public.client_fwp_keys drop constraint if exists client_fwp_keys_key_value_check;
+alter table public.client_fwp_keys add constraint client_fwp_keys_key_value_check
+ check(char_length(key_value) between 1 and 98 and char_length(btrim(key_value)) > 0);
 alter table public.client_fwp_keys enable row level security;
 revoke all on public.client_fwp_keys from public,anon,authenticated;
 grant select,insert,update on public.client_fwp_keys to authenticated;
