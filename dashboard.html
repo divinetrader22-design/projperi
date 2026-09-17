@@ -275,10 +275,13 @@
       <label for="fwpInput">FWP-Key (up to 98 characters)</label>
       <input id="fwpInput" type="password" maxlength="98" required autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Enter or replace your FWP-Key">
       <button id="fwpSave" type="submit" class="ctrl-btn primary">Save key</button>
+      <button id="fwpCancel" type="button" class="ctrl-btn" hidden onclick="cancelFwpChange()">Cancel</button>
     </form>
     <div id="fwpClientReveal" style="display:none;margin-top:12px;">
       <span id="fwpMaskedValue" style="overflow-wrap:anywhere;">••••••••••••</span>
       <button id="fwpReveal" type="button" class="ctrl-btn" onclick="revealFwpKey()">Reveal</button>
+      <button id="fwpChange" type="button" class="ctrl-btn" onclick="changeFwpKey()">Change key</button>
+      <button id="fwpDelete" type="button" class="ctrl-btn" onclick="deleteFwpKey()">Delete key</button>
       <p class="panel-helper">The saved key hides after 30 seconds or when you leave this window.</p>
     </div>
     <p id="fwpConnection" class="form-status" role="status"></p>
@@ -388,6 +391,7 @@
   let clientNotes = [];
   let editingClientNoteId = null;
   let fwpKeyIsSet = false;
+  let fwpEditing = false;
   let fwpBusy = false;
   let fwpVisible = false;
   let fwpRevealVersion = 0;
@@ -750,10 +754,12 @@
 
   function updateFwpControls(){
     const client = currentRole === 'client';
-    document.getElementById('fwpForm').style.display = client ? 'flex' : 'none';
+    document.getElementById('fwpForm').style.display = client && (!fwpKeyIsSet || fwpEditing) ? 'flex' : 'none';
+    document.getElementById('fwpCancel').hidden = !fwpKeyIsSet || !fwpEditing;
+    document.getElementById('fwpSave').textContent = fwpKeyIsSet ? 'Save changes' : 'Save key';
     document.getElementById('fwpClientReveal').style.display = client && fwpKeyIsSet ? 'block' : 'none';
     document.getElementById('fwpSavedStatus').textContent = fwpKeyIsSet ? 'Set' : 'Not set';
-    for (const id of ['fwpInput','fwpSave','fwpRefresh','fwpReveal']) document.getElementById(id).disabled = fwpBusy;
+    for (const id of ['fwpInput','fwpSave','fwpRefresh','fwpReveal','fwpChange','fwpDelete','fwpCancel']) document.getElementById(id).disabled = fwpBusy;
     updateQuoteControls();
   }
 
@@ -778,8 +784,9 @@
       document.getElementById('fwpConnection').textContent = 'Could not connect. Refresh status to try again.';
     } finally {
       fwpBusy = false;
-      for (const id of ['fwpInput','fwpSave','fwpRefresh','fwpReveal']) document.getElementById(id).disabled = false;
-      updateQuoteControls();
+      const status = document.getElementById('fwpSavedStatus').textContent;
+      updateFwpControls();
+      if (status === 'Status unavailable') document.getElementById('fwpSavedStatus').textContent = status;
     }
   }
 
@@ -789,6 +796,46 @@
     fwpVisible = false;
     document.getElementById('fwpMaskedValue').textContent = '••••••••••••';
     document.getElementById('fwpReveal').textContent = 'Reveal';
+  }
+
+  function changeFwpKey(){
+    if (currentRole !== 'client' || !fwpKeyIsSet || fwpBusy) return;
+    hideFwpKey();
+    fwpEditing = true;
+    document.getElementById('fwpInput').value = '';
+    updateFwpControls();
+    document.getElementById('fwpInput').focus();
+  }
+
+  function cancelFwpChange(){
+    if (fwpBusy) return;
+    fwpEditing = false;
+    document.getElementById('fwpInput').value = '';
+    updateFwpControls();
+  }
+
+  async function deleteFwpKey(){
+    if (currentRole !== 'client' || !project || !fwpKeyIsSet || fwpBusy) return;
+    if (!confirm('Delete your saved FWP-Key? Get quote will be disabled until you save another key.')) return;
+    hideFwpKey();
+    clearClientQuote();
+    document.getElementById('quoteStatus').textContent = '';
+    fwpBusy = true;
+    updateFwpControls();
+    try {
+      const { error } = await supabaseClient.from('client_fwp_keys').delete()
+        .eq('project_id', project.id).eq('client_id', sessionUser.id);
+      if (error) throw new Error('Delete failed');
+      fwpKeyIsSet = false;
+      fwpEditing = false;
+      document.getElementById('fwpInput').value = '';
+      document.getElementById('fwpConnection').textContent = 'Key deleted. Save a new key to get a quote.';
+    } catch {
+      document.getElementById('fwpConnection').textContent = 'Could not delete the key. Please try again.';
+    } finally {
+      fwpBusy = false;
+      updateFwpControls();
+    }
   }
 
   async function saveFwpKey(event){
@@ -809,6 +856,7 @@
       if (error) throw new Error('Save failed');
       input.value = '';
       fwpKeyIsSet = true;
+      fwpEditing = false;
       clearClientQuote();
       document.getElementById('fwpConnection').textContent = 'Key saved · Connected to Supabase';
     } catch {

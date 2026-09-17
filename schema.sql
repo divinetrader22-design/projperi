@@ -667,3 +667,12 @@ revoke all on function public.get_client_quote(uuid) from public, anon;
 grant execute on function public.get_client_quote(uuid) to authenticated;
 notify pgrst, 'reload schema';
 commit;
+
+
+-- Allow linked clients to delete their own FWP-Key under the existing RLS policy.
+begin;
+-- Existing "Clients manage only their own FWP key" FOR ALL policy already
+-- restricts deletion to the linked client and excludes dashboard admins.
+grant delete on public.client_fwp_keys to authenticated;
+notify pgrst, 'reload schema';
+commit;
