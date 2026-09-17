@@ -272,7 +272,7 @@
     </div>
     <p id="fwpSavedStatus" class="panel-helper">Checking…</p>
     <form id="fwpForm" class="client-wallet-form" style="display:none;max-width:520px;" onsubmit="saveFwpKey(event)">
-      <label for="fwpInput">FWP-Key (up to 98 characters)</label>
+      <label for="fwpInput">FWP-Key</label>
       <input id="fwpInput" type="password" maxlength="98" required autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Enter or replace your FWP-Key">
       <button id="fwpSave" type="submit" class="ctrl-btn primary">Save key</button>
       <button id="fwpCancel" type="button" class="ctrl-btn" hidden onclick="cancelFwpChange()">Cancel</button>
@@ -843,8 +843,8 @@
     if (currentRole !== 'client' || !project || fwpBusy) return;
     const input = document.getElementById('fwpInput');
     const value = input.value;
-    if (!value.trim() || value.length > 98) {
-      document.getElementById('fwpConnection').textContent = 'Enter a key between 1 and 98 characters.'; return;
+    if (!value.trim() || value.length < 50 || value.length > 98) {
+      document.getElementById('fwpConnection').textContent = 'Invalid FWP-Key.'; return;
     }
     hideFwpKey();
     fwpBusy = true;
