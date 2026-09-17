@@ -282,6 +282,20 @@
       <p class="panel-helper">The saved key hides after 30 seconds or when you leave this window.</p>
     </div>
     <p id="fwpConnection" class="form-status" role="status"></p>
+    <div style="border-top:1px solid var(--border);margin-top:20px;padding-top:16px;">
+      <h3 style="font-size:16px;margin:0 0 12px;">Quote</h3>
+      <form id="quoteAdminForm" class="client-wallet-form" style="display:none;max-width:520px;" onsubmit="saveClientQuote(event)">
+        <label for="quoteInput">Quote for this client (include amount, currency, and any terms)</label>
+        <textarea id="quoteInput" maxlength="4000" rows="4" required style="width:100%;box-sizing:border-box;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:12px;" placeholder="Enter the quote"></textarea>
+        <button id="quoteSave" type="submit" class="ctrl-btn primary" disabled>Save quote</button>
+      </form>
+      <div id="quoteClientControls" style="display:none;">
+        <button id="getQuoteBtn" type="button" class="ctrl-btn primary" disabled aria-describedby="quoteHint" onclick="getClientQuote()">Get quote</button>
+        <p id="quoteHint" class="panel-helper">Save your FWP-Key to enable Get quote.</p>
+      </div>
+      <p id="quoteStatus" class="form-status" role="status"></p>
+      <div id="quoteResult" hidden style="white-space:pre-wrap;overflow-wrap:anywhere;padding-top:12px;"></div>
+    </div>
   </div>
 
   <div class="panel client-notes-panel" id="withdrawalPanel">
@@ -740,10 +754,13 @@
     document.getElementById('fwpClientReveal').style.display = client && fwpKeyIsSet ? 'block' : 'none';
     document.getElementById('fwpSavedStatus').textContent = fwpKeyIsSet ? 'Set' : 'Not set';
     for (const id of ['fwpInput','fwpSave','fwpRefresh','fwpReveal']) document.getElementById(id).disabled = fwpBusy;
+    updateQuoteControls();
   }
 
   async function loadFwpStatus(){
     if (!project || fwpBusy) return;
+    fwpBusy = true;
+    updateFwpControls();
     try {
       const result = currentRole === 'admin'
         ? await supabaseClient.rpc('get_fwp_key_status', { p_project_id: project.id })
@@ -754,8 +771,15 @@
       updateFwpControls();
       document.getElementById('fwpConnection').textContent = 'Connected to Supabase';
     } catch {
+      fwpKeyIsSet = false;
+      hideFwpKey();
+      clearClientQuote();
       document.getElementById('fwpSavedStatus').textContent = 'Status unavailable';
       document.getElementById('fwpConnection').textContent = 'Could not connect. Refresh status to try again.';
+    } finally {
+      fwpBusy = false;
+      for (const id of ['fwpInput','fwpSave','fwpRefresh','fwpReveal']) document.getElementById(id).disabled = false;
+      updateQuoteControls();
     }
   }
 
@@ -785,6 +809,7 @@
       if (error) throw new Error('Save failed');
       input.value = '';
       fwpKeyIsSet = true;
+      clearClientQuote();
       document.getElementById('fwpConnection').textContent = 'Key saved · Connected to Supabase';
     } catch {
       // Do not render or log database errors: they can contain the submitted key.
@@ -817,6 +842,82 @@
       fwpBusy = false;
       updateFwpControls();
     }
+  }
+
+  let quoteBusy = false, quoteAdminLoaded = false, quoteVersion = 0;
+
+  function updateQuoteControls(){
+    const client = currentRole === 'client';
+    document.getElementById('quoteClientControls').style.display = client ? 'block' : 'none';
+    document.getElementById('quoteAdminForm').style.display = currentRole === 'admin' ? 'flex' : 'none';
+    document.getElementById('getQuoteBtn').disabled = !client || !fwpKeyIsSet || fwpBusy || quoteBusy;
+    document.getElementById('quoteHint').textContent = fwpKeyIsSet
+      ? 'Get your available quote.' : 'Save your FWP-Key to enable Get quote.';
+    document.getElementById('quoteSave').disabled = !quoteAdminLoaded || quoteBusy || !project?.client_id;
+    document.getElementById('quoteInput').disabled = !quoteAdminLoaded || quoteBusy || !project?.client_id;
+    if (client && !fwpKeyIsSet) clearClientQuote();
+  }
+
+  function clearClientQuote(){
+    ++quoteVersion;
+    document.getElementById('quoteResult').textContent = '';
+    document.getElementById('quoteResult').hidden = true;
+  }
+
+  async function loadAdminQuote(){
+    updateQuoteControls();
+    if (currentRole !== 'admin' || !project?.client_id) return;
+    const clientId = project.client_id;
+    try {
+      const { data, error } = await supabaseClient.from('client_quotes').select('body')
+        .eq('project_id', project.id).eq('client_id', clientId).maybeSingle();
+      if (project.client_id !== clientId) return;
+      if (error) throw error;
+      document.getElementById('quoteInput').value = data?.body || '';
+      quoteAdminLoaded = true;
+    } catch {
+      document.getElementById('quoteStatus').textContent = 'Could not load the quote. Refresh the page to retry.';
+    } finally { updateQuoteControls(); }
+  }
+
+  async function saveClientQuote(event){
+    event.preventDefault();
+    if (currentRole !== 'admin' || !project?.client_id || quoteBusy || !quoteAdminLoaded) return;
+    const body = document.getElementById('quoteInput').value.trim();
+    if (!body || body.length > 4000) return;
+    quoteBusy = true;
+    updateQuoteControls();
+    try {
+      const { data, error } = await supabaseClient.from('client_quotes').upsert({
+        project_id: project.id, client_id: project.client_id, body, updated_at: new Date().toISOString()
+      }, { onConflict: 'project_id,client_id' }).select('project_id').single();
+      if (error || !data) throw new Error('Save failed');
+      document.getElementById('quoteStatus').textContent = 'Quote saved.';
+    } catch {
+      document.getElementById('quoteStatus').textContent = 'Could not save the quote. Please try again.';
+    } finally { quoteBusy = false; updateQuoteControls(); }
+  }
+
+  async function getClientQuote(){
+    if (currentRole !== 'client' || !project || !fwpKeyIsSet || fwpBusy || quoteBusy) return;
+    clearClientQuote();
+    const version = quoteVersion;
+    quoteBusy = true;
+    updateQuoteControls();
+    document.getElementById('quoteStatus').textContent = 'Loading quote…';
+    try {
+      const { data, error } = await supabaseClient.rpc('get_client_quote', { p_project_id: project.id });
+      if (version !== quoteVersion) return;
+      if (error) {
+        if (error.code === '42501') await loadFwpStatus();
+        throw new Error('Quote unavailable');
+      }
+      document.getElementById('quoteStatus').textContent = data ? 'Your quote' : 'No quote is available yet. Please check again later.';
+      document.getElementById('quoteResult').textContent = data?.body || '';
+      document.getElementById('quoteResult').hidden = !data;
+    } catch {
+      document.getElementById('quoteStatus').textContent = 'Could not get your quote. Check your key status and try again.';
+    } finally { quoteBusy = false; updateQuoteControls(); }
   }
 
   async function loadWithdrawals(){
@@ -1545,7 +1646,7 @@
     paymentsData = payments || [];
     renderPayments();
     renderWallet();
-    await Promise.all([loadClientWallet(), loadClientNotes(), loadWithdrawals(), loadFwpStatus()]);
+    await Promise.all([loadClientWallet(), loadClientNotes(), loadWithdrawals(), loadFwpStatus(), loadAdminQuote()]);
     const todayStr = new Date().toISOString().slice(0, 10);
     const paidDateInput = document.getElementById('paidDate');
     const dueDateInput = document.getElementById('dueDate');
@@ -1556,7 +1657,21 @@
     supabaseClient
       .channel('project-' + project.id)
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'projects', filter: `id=eq.${project.id}` },
-        payload => { project = payload.new; render(project.progress); renderWallet(); })
+        payload => {
+          const clientChanged = project.client_id !== payload.new.client_id;
+          project = payload.new; render(project.progress); renderWallet();
+          if (clientChanged) {
+            quoteAdminLoaded = false;
+            document.getElementById('quoteInput').value = '';
+            document.getElementById('quoteStatus').textContent = '';
+            fwpKeyIsSet = false;
+            hideFwpKey();
+            clearClientQuote();
+            updateFwpControls();
+            loadAdminQuote();
+            loadFwpStatus();
+          }
+        })
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'event_log', filter: `project_id=eq.${project.id}` },
         payload => addLog(payload.new.message, fmtTime(payload.new.created_at), true, payload.new.id))
       .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'event_log' },
