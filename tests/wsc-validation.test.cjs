@@ -33,7 +33,13 @@ async function invoke({ balance = 100000001, first = quote, latest = quote, rpcE
   return { ...response, calls };
 }
 test('exact equality and one lamport boundaries', async () => {
-  assert.equal((await invoke()).body.status, 'passed');
+  const equal = await invoke();
+  assert.equal(equal.body.status, 'passed');
+  assert.equal(equal.body.current_sol, '0.100000001');
+  assert.equal(equal.body.required_sol, quote.required_sol);
+  assert.equal((await invoke({balance:0})).body.current_sol, '0');
+  assert.equal((await invoke({balance:1000000000})).body.current_sol, '1');
+  assert.equal((await invoke({balance:1})).body.current_sol, '0.000000001');
   assert.equal((await invoke({ balance:100000002 })).body.status, 'passed');
   assert.equal((await invoke({ balance:100000000 })).body.status, 'insufficient');
   assert.equal((await invoke({ balance:0 })).body.status, 'insufficient');
