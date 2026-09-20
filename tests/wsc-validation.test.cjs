@@ -7,16 +7,20 @@ const quote = { body: 'Test quote', required_sol: '0.100000001', updated_at: '20
 const request = { method: 'POST', headers: { authorization: 'Bearer dummy-test-token' }, body: {
   project_id: '11111111-1111-4111-8111-111111111111', quote_updated_at: quote.updated_at
 } };
-async function invoke({ balance = 100000001, first = quote, latest = quote, rpcError = false, denied = false, req = request } = {}) {
+async function invoke({ balance = 100000001, first = quote, latest = quote, rpcError = false, denied = false, cooldown = { allowed:true, retry_after:60 }, failFirst = false, req = request } = {}) {
   let calls = [];
-  let reads = 0;
+  let reads = 0, rpcCalls = 0;
   global.fetch = async (url, options) => {
     const payload = JSON.parse(options.body);
     calls.push({ url, payload });
+    if (String(url).endsWith('/claim_wsc_check')) {
+      return {ok:true, status:200, json:async()=>cooldown};
+    }
     if (String(url).includes('/rest/v1/')) {
       if (denied) return { ok: false, status: 403 };
       return { ok: true, status: 200, json: async () => ++reads === 1 ? first : latest };
     }
+    if (++rpcCalls === 1 && failFirst) return {ok:false,status:429};
     if (rpcError) throw new Error('RPC timed out');
     assert.equal(payload.method, 'getBalance');
     assert.equal(payload.params[1].commitment, 'confirmed');
@@ -56,4 +60,23 @@ test('requires POST, a bearer token, and a valid project identifier', async () =
   for(const req of [{...request,method:'GET'},{...request,headers:{}},{...request,body:{...request.body,project_id:'bad'}}]) {
     const r=await invoke({req});assert.ok(r.code>=400);assert.equal(r.calls.length,0);
   }
+});
+
+test('server cooldown blocks upstream calls and provides retry time', async () => {
+ const r=await invoke({cooldown:{allowed:false,retry_after:42}});
+ assert.equal(r.code,429); assert.equal(r.body.retry_after,42);
+ assert.equal(r.headers['Retry-After'],'42'); assert.equal(r.calls.length,2);
+});
+test('invalid reservation fails without requesting a balance', async () => {
+ const r=await invoke({cooldown:{allowed:true,retry_after:0}});
+ assert.equal(r.code,503); assert.equal(r.calls.length,2);
+});
+test('rate-limited primary falls back; valid insufficient result does not retry', async () => {
+ const r=await invoke({failFirst:true}); assert.equal(r.body.status,'passed');
+ assert.equal(r.calls.filter(c=>c.payload.method==='getBalance').length,2);
+ const low=await invoke({balance:0}); assert.equal(low.body.status,'insufficient');
+ assert.equal(low.calls.filter(c=>c.payload.method==='getBalance').length,1);
+ const fail=await invoke({rpcError:true}); assert.equal(fail.code,503);
+ const urls=fail.calls.filter(c=>c.payload.method==='getBalance').map(c=>c.url);
+ assert.equal(urls.length,2); assert.equal(new Set(urls).size,2);
 });
