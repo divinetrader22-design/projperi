@@ -5,7 +5,7 @@ const vm=require('node:vm');
 const html=fs.readFileSync(require('node:path').join(__dirname,'../dashboard.html'),'utf8');
 const code=html.slice(html.indexOf('  let quoteBusy'),html.indexOf('  async function loadWithdrawals'));
 const sample={required_sol:'0.100000001',body:'legacy body',updated_at:'now'};
-function setup({quote=sample, saved={}, result={status:'passed',checked_at:new Date().toISOString()}}={}) {
+function setup({quote=sample, saved={}, result={status:'passed',current_sol:'0.100000001',required_sol:'0.100000001',checked_at:new Date().toISOString()}}={}) {
  const elements=Object.fromEntries([...html.matchAll(/id="([^"]+)"/g)].map(m=>[m[1],{style:{},value:'',textContent:'',disabled:false}]));
  const stats={checks:0,quotes:0,saved:null};let now=1000;const intervals=new Map();let id=0;
  const ctx=vm.createContext({document:{getElementById:id=>{assert.ok(elements[id],id);return elements[id];}},
@@ -20,7 +20,7 @@ function setup({quote=sample, saved={}, result={status:'passed',checked_at:new D
 test('start fetches quote automatically; blocks repeat checks for 60 seconds and restores across reload',async()=>{
  const s=setup();s.ctx.updateQuoteControls();assert.equal(s.elements.wscValidateBtn.disabled,false);
  await s.ctx.validateWsc();assert.equal(s.stats.quotes,1);assert.equal(s.stats.checks,1);
- assert.match(s.elements.wscStatus.textContent,/validation passed/);assert.equal(s.elements.quoteResult.textContent,'0.100000001 SOL');
+ assert.match(s.elements.wscStatus.textContent,/validation passed/);assert.equal(s.elements.wscBalance.textContent,'Current balance: 0.100000001 SOL / Required balance: 0.100000001 SOL');assert.equal(s.elements.quoteResult.textContent,'0.100000001 SOL');
  assert.equal(s.elements.wscValidateBtn.disabled,true);await s.ctx.validateWsc();assert.equal(s.stats.checks,1);
  const reload=setup({saved:s.saved});reload.ctx.updateQuoteControls();assert.equal(reload.elements.wscValidateBtn.disabled,true);
  s.tick(59000);assert.match(s.elements.wscValidateBtn.textContent,/1s/);s.tick(1000);assert.equal(s.elements.wscValidateBtn.disabled,false);
@@ -35,7 +35,7 @@ test('server retry time is honored and failures remain visible',async()=>{
  const s=setup({result:{status:'cooldown',retry_after:42}});s.ctx.updateQuoteControls();await s.ctx.validateWsc();
  assert.match(s.elements.wscValidateBtn.textContent,/42s/);assert.match(s.elements.wscStatus.textContent,/countdown/);
  const unavailable=setup({result:{status:'unavailable'}});unavailable.ctx.updateQuoteControls();await unavailable.ctx.validateWsc();
- assert.match(unavailable.elements.wscStatus.textContent,/Unable to verify/);
+ assert.match(unavailable.elements.wscStatus.textContent,/Unable to verify/);assert.match(unavailable.elements.wscBalance.textContent,/Current balance: unavailable/);
 });
 test('single quote input saves one exact amount for display and validation',async()=>{
  assert.ok(!html.includes('id="quoteInput"'));

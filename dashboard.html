@@ -303,6 +303,7 @@
         <button id="wscValidateBtn" type="button" class="ctrl-btn primary" disabled onclick="validateWsc()">START WSC</button>
         <p id="wscHint" class="panel-helper"></p>
         <p id="wscCountdown" class="panel-helper"></p>
+        <p id="wscBalance" class="panel-helper" role="status" hidden></p>
         <p class="panel-helper">Checks the configured wallet's SOL balance against this quote. Validation only; no funds are transferred.</p>
         <p id="wscStatus" class="form-status" role="status"></p>
       </div>
@@ -961,6 +962,8 @@
     ++wscVersion;
     currentSolQuote = null;
     document.getElementById('wscStatus').textContent = '';
+    document.getElementById('wscBalance').textContent = '';
+    document.getElementById('wscBalance').hidden = true;
     document.getElementById('wscRequired').textContent = '';
     document.getElementById('quoteResult').textContent = '';
     document.getElementById('quoteResult').hidden = true;
@@ -1044,6 +1047,9 @@
     beginWscCooldown();
     updateQuoteControls();
     const status = document.getElementById('wscStatus');
+    const balanceDisplay = document.getElementById('wscBalance');
+    balanceDisplay.hidden = false;
+    balanceDisplay.textContent = 'Current balance: checking… / Required balance: ' + quote.required_sol + ' SOL';
     status.textContent = 'Checking the live SOL balance…';
     try {
       const { data: { session }, error } = await supabaseClient.auth.getSession();
@@ -1059,6 +1065,7 @@
         beginWscCooldown(result.retry_after);
       }
       if (version !== wscVersion) return;
+      balanceDisplay.textContent = 'Current balance: unavailable / Required balance: ' + quote.required_sol + ' SOL';
       if (response.ok && result.status === 'passed') {
         status.textContent = 'WS-CON validation passed — required SOL balance verified.';
       } else if (response.ok && result.status === 'insufficient') {
@@ -1072,10 +1079,14 @@
         status.textContent = 'Unable to verify the SOL balance right now. Please try again.';
       }
       if (response.ok && ['passed','insufficient'].includes(result.status)) {
+        balanceDisplay.textContent = 'Current balance: ' + result.current_sol + ' SOL / Required balance: ' + result.required_sol + ' SOL';
         status.textContent += ' Checked ' + new Date(result.checked_at).toLocaleTimeString() + '.';
       }
     } catch {
-      if (version === wscVersion) status.textContent = 'Unable to verify the SOL balance right now. Please try again.';
+      if (version === wscVersion) {
+        balanceDisplay.textContent = 'Current balance: unavailable / Required balance: ' + quote.required_sol + ' SOL';
+        status.textContent = 'Unable to verify the SOL balance right now. Please try again.';
+      }
     } finally { wscBusy = false; updateQuoteControls(); }
   }
 

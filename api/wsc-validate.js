@@ -26,6 +26,12 @@ function lamports(value) {
   return amount;
 }
 
+function formatSol(value) {
+  const amount = BigInt(value);
+  const fraction = (amount % 1000000000n).toString().padStart(9, '0').replace(/0+$/, '');
+  return (amount / 1000000000n).toString() + (fraction ? '.' + fraction : '');
+}
+
 async function readQuote(authorization, projectId) {
   // Supabase verifies the JWT; the RPC enforces client ownership and a saved FWP-Key.
   const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/get_client_quote`, {
@@ -98,7 +104,8 @@ async function handler(req, res) {
         || latest.quote.body !== quote.body) return reply(409, 'quote_changed', MESSAGES.changed);
     const enough = BigInt(balance) >= required;
     return reply(200, enough ? 'passed' : 'insufficient', enough ? MESSAGES.passed : MESSAGES.insufficient,
-      { checked_at: new Date().toISOString(), slot: packet.result.context.slot });
+      { current_sol: formatSol(balance), required_sol: quote.required_sol,
+        checked_at: new Date().toISOString(), slot: packet.result.context.slot });
   } catch {
     // Network/provider errors are not evidence of an insufficient balance.
     return reply(503, 'unavailable', MESSAGES.unavailable);
