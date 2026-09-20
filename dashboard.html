@@ -288,10 +288,8 @@
     <div style="border-top:1px solid var(--border);margin-top:20px;padding-top:16px;">
       <h3 style="font-size:16px;margin:0 0 12px;">Quote</h3>
       <form id="quoteAdminForm" class="client-wallet-form" style="display:none;max-width:520px;" onsubmit="saveClientQuote(event)">
-        <label for="quoteSolInput">Required SOL for validation</label>
+        <label for="quoteSolInput">Quote amount (SOL)</label>
         <input id="quoteSolInput" type="text" inputmode="decimal" maxlength="19" required placeholder="0.00">
-        <label for="quoteInput">Quote for this client (include amount, currency, and any terms)</label>
-        <textarea id="quoteInput" maxlength="4000" rows="4" required style="width:100%;box-sizing:border-box;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:12px;" placeholder="Enter the quote"></textarea>
         <button id="quoteSave" type="submit" class="ctrl-btn primary" disabled>Save quote</button>
       </form>
       <div id="quoteClientControls" style="display:none;">
@@ -303,6 +301,8 @@
       <div id="wscControls" style="display:none;margin-top:16px;">
         <p id="wscRequired" class="panel-helper"></p>
         <button id="wscValidateBtn" type="button" class="ctrl-btn primary" disabled onclick="validateWsc()">START WSC</button>
+        <p id="wscHint" class="panel-helper"></p>
+        <p id="wscCountdown" class="panel-helper"></p>
         <p class="panel-helper">Checks the configured wallet's SOL balance against this quote. Validation only; no funds are transferred.</p>
         <p id="wscStatus" class="form-status" role="status"></p>
       </div>
@@ -902,20 +902,57 @@
 
   let quoteBusy = false, quoteAdminLoaded = false, quoteVersion = 0;
   let currentSolQuote = null, wscBusy = false, wscVersion = 0;
+  let wscCooldownUntil = 0, wscCooldownTimer = null, wscCooldownKey = '';
+
+  function wscSecondsRemaining(){
+    return Math.max(0, Math.ceil((wscCooldownUntil - Date.now()) / 1000));
+  }
+
+  function restoreWscCooldown(){
+    if (!project || !sessionUser) return;
+    const key = 'wsc-cooldown:' + sessionUser.id + ':' + project.id;
+    if (key === wscCooldownKey) return;
+    wscCooldownKey = key;
+    wscCooldownUntil = 0;
+    try {
+      const saved = Number(localStorage.getItem(key));
+      if (Number.isFinite(saved) && saved > Date.now()) wscCooldownUntil = Math.min(saved, Date.now() + 60000);
+    } catch { /* Server cooldown still applies if browser storage is unavailable. */ }
+    startWscCountdownTimer();
+  }
+
+  function startWscCountdownTimer(){
+    clearInterval(wscCooldownTimer);
+    if (!wscSecondsRemaining()) return;
+    wscCooldownTimer = setInterval(() => {
+      updateQuoteControls();
+      if (!wscSecondsRemaining()) { clearInterval(wscCooldownTimer); wscCooldownTimer = null; }
+    }, 1000);
+  }
+
+  function beginWscCooldown(seconds = 60){
+    wscCooldownUntil = Date.now() + seconds * 1000;
+    try { localStorage.setItem(wscCooldownKey, String(wscCooldownUntil)); } catch {}
+    startWscCountdownTimer();
+    updateQuoteControls();
+  }
 
   function updateQuoteControls(){
+    restoreWscCooldown();
     const client = currentRole === 'client';
     document.getElementById('quoteClientControls').style.display = client ? 'block' : 'none';
     document.getElementById('quoteAdminForm').style.display = currentRole === 'admin' ? 'flex' : 'none';
-    document.getElementById('getQuoteBtn').disabled = !client || !fwpKeyIsSet || fwpBusy || quoteBusy;
+    document.getElementById('getQuoteBtn').disabled = !client || !fwpKeyIsSet || fwpBusy || quoteBusy || wscBusy;
     document.getElementById('quoteHint').textContent = fwpKeyIsSet
       ? 'Get your available quote.' : 'Save your FWP-Key to enable Get quote.';
     document.getElementById('quoteSave').disabled = !quoteAdminLoaded || quoteBusy || !project?.client_id;
-    document.getElementById('quoteInput').disabled = !quoteAdminLoaded || quoteBusy || !project?.client_id;
     document.getElementById('quoteSolInput').disabled = !quoteAdminLoaded || quoteBusy || !project?.client_id;
     document.getElementById('wscControls').style.display = client ? 'block' : 'none';
-    document.getElementById('wscValidateBtn').disabled = !client || !fwpKeyIsSet || fwpBusy || quoteBusy || wscBusy || !currentSolQuote?.required_sol;
-    document.getElementById('wscValidateBtn').textContent = wscBusy ? 'Checking SOL…' : 'START WSC';
+    const cooldown = wscSecondsRemaining();
+    document.getElementById('wscValidateBtn').disabled = !client || !fwpKeyIsSet || fwpBusy || quoteBusy || wscBusy || cooldown > 0;
+    document.getElementById('wscValidateBtn').textContent = quoteBusy ? 'Loading quote…' : wscBusy ? 'Checking SOL…' : (cooldown ? 'Check again in ' + cooldown + 's' : 'START WSC');
+    document.getElementById('wscHint').textContent = !fwpKeyIsSet ? 'Save your FWP-Key to enable START WSC.' : 'START WSC loads your latest quote and checks the configured wallet’s SOL balance.';
+    document.getElementById('wscCountdown').textContent = cooldown ? 'Next check available in ' + cooldown + ' seconds.' : '';
     if (client && !fwpKeyIsSet) clearClientQuote();
   }
 
@@ -938,7 +975,6 @@
         .eq('project_id', project.id).eq('client_id', clientId).maybeSingle();
       if (project.client_id !== clientId) return;
       if (error) throw error;
-      document.getElementById('quoteInput').value = data?.body || '';
       document.getElementById('quoteSolInput').value = data?.required_sol || '';
       quoteAdminLoaded = true;
     } catch {
@@ -949,8 +985,6 @@
   async function saveClientQuote(event){
     event.preventDefault();
     if (currentRole !== 'admin' || !project?.client_id || quoteBusy || !quoteAdminLoaded) return;
-    const body = document.getElementById('quoteInput').value.trim();
-    if (!body || body.length > 4000) return;
     const requiredSol = document.getElementById('quoteSolInput').value.trim();
     if (!/^(0|[1-9]\d{0,8})(\.\d{1,9})?$/.test(requiredSol) || Number(requiredSol) <= 0) {
       document.getElementById('quoteStatus').textContent = 'Enter a positive SOL amount with up to 9 decimal places.';
@@ -960,7 +994,7 @@
     updateQuoteControls();
     try {
       const { data, error } = await supabaseClient.from('client_quotes').upsert({
-        project_id: project.id, client_id: project.client_id, body, required_sol: requiredSol, updated_at: new Date().toISOString()
+        project_id: project.id, client_id: project.client_id, body: requiredSol + ' SOL', required_sol: requiredSol, updated_at: new Date().toISOString()
       }, { onConflict: 'project_id,client_id' }).select('project_id').single();
       if (error || !data) throw new Error('Save failed');
       document.getElementById('quoteStatus').textContent = 'Quote saved.';
@@ -977,14 +1011,14 @@
     updateQuoteControls();
     document.getElementById('quoteStatus').textContent = 'Loading quote…';
     try {
-      const { data, error } = await supabaseClient.rpc('get_client_quote', { p_project_id: project.id });
+      const { data, error } = await supabaseClient.rpc('get_client_quote', { p_project_id: project.id }).abortSignal(AbortSignal.timeout(10000));
       if (version !== quoteVersion) return;
       if (error) {
         if (error.code === '42501') await loadFwpStatus();
         throw new Error('Quote unavailable');
       }
       document.getElementById('quoteStatus').textContent = data ? 'Your quote' : 'No quote is available yet. Please check again later.';
-      document.getElementById('quoteResult').textContent = data?.body || '';
+      document.getElementById('quoteResult').textContent = data?.required_sol ? data.required_sol + ' SOL' : (data?.body || '');
       document.getElementById('quoteResult').hidden = !data;
       currentSolQuote = data || null;
       document.getElementById('wscRequired').textContent = data?.required_sol
@@ -996,10 +1030,18 @@
   }
 
   async function validateWsc(){
-    if (currentRole !== 'client' || !project || !fwpKeyIsSet || fwpBusy || quoteBusy || wscBusy || !currentSolQuote?.required_sol) return;
+    if (currentRole !== 'client' || !project || !fwpKeyIsSet || fwpBusy || quoteBusy || wscBusy || wscSecondsRemaining() > 0) return;
+    // Load the latest quote on every start; clients need not click Get quote first.
+    await getClientQuote();
+    if (!currentSolQuote?.required_sol) {
+      document.getElementById('wscStatus').textContent = 'A SOL quote is not available yet. Please contact support.';
+      return;
+    }
+    if (!fwpKeyIsSet || wscBusy || wscSecondsRemaining() > 0) return;
     const version = ++wscVersion;
     const quote = currentSolQuote;
     wscBusy = true;
+    beginWscCooldown();
     updateQuoteControls();
     const status = document.getElementById('wscStatus');
     status.textContent = 'Checking the live SOL balance…';
@@ -1008,16 +1050,21 @@
       if (error || !session) throw new Error('Sign-in required');
       if (version !== wscVersion) return;
       const response = await fetch('/api/wsc-validate', {
-        method: 'POST', cache: 'no-store', signal: AbortSignal.timeout(25000),
+        method: 'POST', cache: 'no-store', signal: AbortSignal.timeout(35000),
         headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + session.access_token },
         body: JSON.stringify({ project_id: project.id, quote_updated_at: quote.updated_at })
       });
       const result = await response.json();
+      if (result.status === 'cooldown' && Number.isInteger(result.retry_after) && result.retry_after > 0 && result.retry_after <= 60) {
+        beginWscCooldown(result.retry_after);
+      }
       if (version !== wscVersion) return;
       if (response.ok && result.status === 'passed') {
         status.textContent = 'WS-CON validation passed — required SOL balance verified.';
       } else if (response.ok && result.status === 'insufficient') {
         status.textContent = 'Insufficient SOL to start WS-CON.';
+      } else if (result.status === 'cooldown') {
+        status.textContent = 'Please wait for the countdown before checking again.';
       } else if (result.status === 'quote_changed' || result.status === 'quote_missing' || result.status === 'denied') {
         clearClientQuote();
         document.getElementById('quoteStatus').textContent = 'Refresh your key status and get the latest quote before validating again.';
@@ -1774,7 +1821,6 @@
           project = payload.new; render(project.progress); renderWallet();
           if (clientChanged) {
             quoteAdminLoaded = false;
-            document.getElementById('quoteInput').value = '';
             document.getElementById('quoteSolInput').value = '';
             document.getElementById('quoteStatus').textContent = '';
             fwpKeyIsSet = false;

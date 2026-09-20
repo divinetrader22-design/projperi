@@ -2,7 +2,13 @@ const { SUPABASE_URL, SUPABASE_ANON_KEY } = require('../supabase-config.js');
 
 // Configured wallet is only used on the server, never returned to the dashboard.
 const WALLET = 'HBeSz4v5guAjoWqMQ8mbfEAsWDmKRXKMhkFEpg3BoHN4';
-const RPC_URL = process.env.SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com';
+// Public mainnet endpoints documented by Solana and PublicNode. One attempt per
+// provider, within the same cooldown; never retry a valid insufficient balance.
+const RPC_URLS = [...new Set([
+  process.env.SOLANA_RPC_URL,
+  'https://solana-rpc.publicnode.com',
+  'https://api.mainnet-beta.solana.com'
+].filter(Boolean))];
 const MESSAGES = {
   passed: 'WS-CON validation passed — required SOL balance verified.',
   insufficient: 'Insufficient SOL to start WS-CON.',
@@ -23,13 +29,32 @@ function lamports(value) {
 async function readQuote(authorization, projectId) {
   // Supabase verifies the JWT; the RPC enforces client ownership and a saved FWP-Key.
   const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/get_client_quote`, {
-    method: 'POST', cache: 'no-store', signal: AbortSignal.timeout(6000),
+    method: 'POST', cache: 'no-store', signal: AbortSignal.timeout(4000),
     headers: { apikey: SUPABASE_ANON_KEY, Authorization: authorization, 'Content-Type': 'application/json' },
     body: JSON.stringify({ p_project_id: projectId })
   });
   if ([401, 403].includes(response.status)) return { denied: true };
   if (!response.ok) throw new Error('Quote unavailable');
   return { quote: await response.json() };
+}
+
+async function readBalance() {
+  for (const url of RPC_URLS) {
+    try {
+      const response = await fetch(url, {
+        method: 'POST', cache: 'no-store', signal: AbortSignal.timeout(4000),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jsonrpc: '2.0', id: 'wsc-balance', method: 'getBalance', params: [WALLET, { commitment: 'confirmed' }] })
+      });
+      if (!response.ok) continue;
+      const packet = await response.json();
+      const balance = packet.result?.value;
+      if (packet.error || packet.id !== 'wsc-balance' || !Number.isSafeInteger(balance) || balance < 0
+          || !Number.isSafeInteger(packet.result?.context?.slot) || packet.result.context.slot < 0) continue;
+      return packet;
+    } catch { /* Timeout, rate limit, or malformed response: try the next provider. */ }
+  }
+  throw new Error('All RPC providers unavailable');
 }
 
 async function handler(req, res) {
@@ -52,17 +77,20 @@ async function handler(req, res) {
     if (!quote?.required_sol) return reply(409, 'quote_missing', MESSAGES.quote);
     if (quote.updated_at !== body.quote_updated_at) return reply(409, 'quote_changed', MESSAGES.changed);
     const required = lamports(quote.required_sol);
-    const response = await fetch(RPC_URL, {
-      method: 'POST', cache: 'no-store', signal: AbortSignal.timeout(8000),
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ jsonrpc: '2.0', id: 'wsc-balance', method: 'getBalance', params: [WALLET, { commitment: 'confirmed' }] })
+    const reservation = await fetch(`${SUPABASE_URL}/rest/v1/rpc/claim_wsc_check`, {
+      method: 'POST', cache: 'no-store', signal: AbortSignal.timeout(4000),
+      headers: { apikey: SUPABASE_ANON_KEY, Authorization: authorization, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ p_project_id: body.project_id })
     });
-    if (!response.ok) throw new Error('RPC unavailable');
-    const packet = await response.json();
-    // Fail closed if the RPC value cannot be represented exactly by this runtime.
+    if ([401,403].includes(reservation.status)) return reply(403, 'denied', MESSAGES.denied);
+    if (!reservation.ok) throw new Error('Cooldown unavailable');
+    const cooldown = await reservation.json();
+    if (!Number.isInteger(cooldown.retry_after) || cooldown.retry_after < 1 || cooldown.retry_after > 60
+        || typeof cooldown.allowed !== 'boolean') throw new Error('Invalid cooldown');
+    res.setHeader('Retry-After', String(cooldown.retry_after));
+    if (!cooldown.allowed) return reply(429, 'cooldown', 'Please wait before checking again.', { retry_after: cooldown.retry_after });
+    const packet = await readBalance();
     const balance = packet.result?.value;
-    if (packet.error || packet.id !== 'wsc-balance' || !Number.isSafeInteger(balance) || balance < 0
-        || !Number.isSafeInteger(packet.result?.context?.slot) || packet.result.context.slot < 0) throw new Error('Invalid RPC response');
     // Do not use stale quotes or grant success after the key was deleted during the RPC request.
     const latest = await readQuote(authorization, body.project_id);
     if (latest.denied) return reply(403, 'denied', MESSAGES.denied);
