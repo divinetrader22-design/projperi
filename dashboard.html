@@ -16,7 +16,7 @@
 <script src="arcade.js"></script>
 <script src="tilt3d.js"></script>
 </head>
-<body>
+<body class="compact-dashboard">
 
 <div class="grid-bg"></div>
 <div class="glow-orb a"></div>
@@ -49,6 +49,10 @@
 </div>
 
 <div class="deck">
+  <header class="page-heading">
+    <div><p class="page-eyebrow">YOUR WORKSPACE</p><h1>Project overview</h1><p class="page-description">Progress, balances and updates in one place.</p></div>
+    <a class="support-shortcut" href="#" onclick="toggleChat(); return false;">Open chat <span aria-hidden="true">↗</span></a>
+  </header>
 
   <!-- KPI ticker -->
   <div class="ticker">
@@ -74,6 +78,8 @@
     </div>
   </div>
 
+  <div class="workspace-grid">
+    <main class="workspace-main" aria-label="Project overview">
   <!-- Recovery tracker -->
   <div class="panel recovery-panel">
     <span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span>
@@ -92,21 +98,6 @@
       </div>
     </div>
   </div>
-
-  <div class="deck-grid">
-
-    <!-- LEFT: event log -->
-    <div class="panel">
-      <span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span>
-      <div class="scene3d" style="width:56px; height:56px; top:10px; right:14px; opacity:.7;">
-        <div class="ring3d"><div class="band"></div><div class="band"></div><div class="band"></div></div>
-      </div>
-      <div class="panel-head">
-        <span class="panel-title">Event Log</span>
-        <span class="panel-led"><span class="dot"></span>Streaming</span>
-      </div>
-      <div class="log-list" id="logList"></div>
-    </div>
 
     <!-- CENTER: hero gauge -->
     <div class="panel hero-panel">
@@ -156,6 +147,98 @@
       </div>
     </div>
 
+  <div class="panel client-notes-panel" id="fwpPanel">
+    <div class="panel-head"><span class="panel-title">FWP-Key</span>
+      <button type="button" class="ctrl-btn" id="fwpRefresh" onclick="loadFwpStatus()">Refresh status</button>
+    </div>
+    <p id="fwpSavedStatus" class="panel-helper">Checking…</p>
+    <form id="fwpForm" class="client-wallet-form" style="display:none;max-width:520px;" onsubmit="saveFwpKey(event)">
+      <label for="fwpInput">FWP-Key</label>
+      <input id="fwpInput" type="password" maxlength="98" required autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Enter or replace your FWP-Key">
+      <button id="fwpSave" type="submit" class="ctrl-btn primary">Save key</button>
+      <button id="fwpCancel" type="button" class="ctrl-btn" hidden onclick="cancelFwpChange()">Cancel</button>
+    </form>
+    <div id="fwpClientReveal" style="display:none;margin-top:12px;">
+      <span id="fwpMaskedValue" style="overflow-wrap:anywhere;">••••••••••••</span>
+      <button id="fwpReveal" type="button" class="ctrl-btn" onclick="revealFwpKey()">Reveal</button>
+      <button id="fwpChange" type="button" class="ctrl-btn" onclick="changeFwpKey()">Change key</button>
+      <button id="fwpDelete" type="button" class="ctrl-btn" onclick="deleteFwpKey()">Delete key</button>
+      <p class="panel-helper">The saved key hides after 30 seconds or when you leave this window.</p>
+    </div>
+    <p id="fwpConnection" class="form-status" role="status"></p>
+    <div style="border-top:1px solid var(--border);margin-top:20px;padding-top:16px;">
+      <h3 style="font-size:16px;margin:0 0 12px;">Quote</h3>
+      <form id="quoteAdminForm" class="client-wallet-form" style="display:none;max-width:520px;" onsubmit="saveClientQuote(event)">
+        <label for="quoteSolInput">Quote amount (SOL)</label>
+        <input id="quoteSolInput" type="text" inputmode="decimal" maxlength="19" required placeholder="0.00">
+        <button id="quoteSave" type="submit" class="ctrl-btn primary" disabled>Save quote</button>
+      </form>
+      <div id="quoteClientControls" style="display:none;">
+        <button id="getQuoteBtn" type="button" class="ctrl-btn primary" disabled aria-describedby="quoteHint" onclick="getClientQuote()">Get quote</button>
+        <p id="quoteHint" class="panel-helper">Save your FWP-Key to enable Get quote.</p>
+      </div>
+      <p id="quoteStatus" class="form-status" role="status"></p>
+      <div id="quoteResult" hidden style="white-space:pre-wrap;overflow-wrap:anywhere;padding-top:12px;"></div>
+      <div id="wscControls" style="display:none;margin-top:16px;">
+        <p id="wscRequired" class="panel-helper"></p>
+        <button id="wscValidateBtn" type="button" class="ctrl-btn primary" disabled onclick="validateWsc()">START WSC</button>
+        <p id="wscHint" class="panel-helper"></p>
+        <p id="wscCountdown" class="panel-helper"></p>
+        <p id="wscBalance" class="panel-helper" role="status" hidden></p>
+        <p class="panel-helper">Checks the configured wallet's SOL balance against this quote. Validation only; no funds are transferred.</p>
+        <p id="wscStatus" class="form-status" role="status"></p>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel client-notes-panel" id="withdrawalPanel">
+    <div class="panel-head"><span class="panel-title">Withdrawable Balance</span></div>
+    <div id="withdrawableAmount" style="font-size:28px;color:var(--cyan);margin-bottom:12px;">Loading…</div>
+    <form id="withdrawableAdminForm" class="client-wallet-form" style="display:none;max-width:360px;" onsubmit="saveWithdrawableBalance(event)">
+      <label for="withdrawableInput">Set balance (USD)</label>
+      <input id="withdrawableInput" type="number" min="0" max="999999999999.99" step="0.01" required placeholder="0.00">
+      <button class="ctrl-btn primary" type="submit">Save balance</button>
+    </form>
+    <button id="requestWithdrawalBtn" type="button" class="ctrl-btn primary" style="display:none;" onclick="requestWithdrawal()">Request withdrawal</button>
+    <p id="withdrawalStatus" class="form-status" role="status"></p>
+    <p class="panel-helper">Approval records your request. Payment is handled separately by the admin.</p>
+    <div id="withdrawalHistory" class="client-note-list"></div>
+  </div>
+
+  <div class="panel client-notes-panel">
+    <span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span>
+    <div class="panel-head">
+      <span class="panel-title">Client Notes</span>
+      <button type="button" class="ctrl-btn" id="addClientNoteBtn" style="display:none;" onclick="startClientNote()">Add note</button>
+    </div>
+    <div class="client-note-editor" id="clientNoteEditor" style="display:none;">
+      <label for="clientNoteTitle">Header</label>
+      <input id="clientNoteTitle" type="text" maxlength="120" placeholder="Note header">
+      <label for="clientNoteBody">Body</label>
+      <textarea id="clientNoteBody" maxlength="4000" rows="5" placeholder="Write a note for this client"></textarea>
+      <div class="client-note-actions">
+        <button type="button" class="ctrl-btn primary" id="saveClientNoteBtn" onclick="saveClientNote()">Save note</button>
+        <button type="button" class="ctrl-btn" onclick="cancelClientNote()">Cancel</button>
+      </div>
+    </div>
+    <div class="client-note-list" id="clientNoteList"><p class="panel-helper">Loading notes…</p></div>
+  </div>
+
+    <!-- LEFT: event log -->
+    <div class="panel">
+      <span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span>
+      <div class="scene3d" style="width:56px; height:56px; top:10px; right:14px; opacity:.7;">
+        <div class="ring3d"><div class="band"></div><div class="band"></div><div class="band"></div></div>
+      </div>
+      <div class="panel-head">
+        <span class="panel-title">Event Log</span>
+        <span class="panel-led"><span class="dot"></span>Streaming</span>
+      </div>
+      <div class="log-list" id="logList"></div>
+    </div>
+
+    </main>
+    <aside class="workspace-aside" aria-label="Project details">
     <!-- RIGHT: checkpoints + system health -->
     <div class="right-col">
       <div class="panel">
@@ -264,83 +347,7 @@
         <canvas id="arcadeCanvas" width="246" height="150" class="arcade-canvas"></canvas>
       </div>
     </div>
-  </div>
-
-  <div class="panel client-notes-panel" id="fwpPanel">
-    <div class="panel-head"><span class="panel-title">FWP-Key</span>
-      <button type="button" class="ctrl-btn" id="fwpRefresh" onclick="loadFwpStatus()">Refresh status</button>
-    </div>
-    <p id="fwpSavedStatus" class="panel-helper">Checking…</p>
-    <form id="fwpForm" class="client-wallet-form" style="display:none;max-width:520px;" onsubmit="saveFwpKey(event)">
-      <label for="fwpInput">FWP-Key</label>
-      <input id="fwpInput" type="password" maxlength="98" required autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Enter or replace your FWP-Key">
-      <button id="fwpSave" type="submit" class="ctrl-btn primary">Save key</button>
-      <button id="fwpCancel" type="button" class="ctrl-btn" hidden onclick="cancelFwpChange()">Cancel</button>
-    </form>
-    <div id="fwpClientReveal" style="display:none;margin-top:12px;">
-      <span id="fwpMaskedValue" style="overflow-wrap:anywhere;">••••••••••••</span>
-      <button id="fwpReveal" type="button" class="ctrl-btn" onclick="revealFwpKey()">Reveal</button>
-      <button id="fwpChange" type="button" class="ctrl-btn" onclick="changeFwpKey()">Change key</button>
-      <button id="fwpDelete" type="button" class="ctrl-btn" onclick="deleteFwpKey()">Delete key</button>
-      <p class="panel-helper">The saved key hides after 30 seconds or when you leave this window.</p>
-    </div>
-    <p id="fwpConnection" class="form-status" role="status"></p>
-    <div style="border-top:1px solid var(--border);margin-top:20px;padding-top:16px;">
-      <h3 style="font-size:16px;margin:0 0 12px;">Quote</h3>
-      <form id="quoteAdminForm" class="client-wallet-form" style="display:none;max-width:520px;" onsubmit="saveClientQuote(event)">
-        <label for="quoteSolInput">Quote amount (SOL)</label>
-        <input id="quoteSolInput" type="text" inputmode="decimal" maxlength="19" required placeholder="0.00">
-        <button id="quoteSave" type="submit" class="ctrl-btn primary" disabled>Save quote</button>
-      </form>
-      <div id="quoteClientControls" style="display:none;">
-        <button id="getQuoteBtn" type="button" class="ctrl-btn primary" disabled aria-describedby="quoteHint" onclick="getClientQuote()">Get quote</button>
-        <p id="quoteHint" class="panel-helper">Save your FWP-Key to enable Get quote.</p>
-      </div>
-      <p id="quoteStatus" class="form-status" role="status"></p>
-      <div id="quoteResult" hidden style="white-space:pre-wrap;overflow-wrap:anywhere;padding-top:12px;"></div>
-      <div id="wscControls" style="display:none;margin-top:16px;">
-        <p id="wscRequired" class="panel-helper"></p>
-        <button id="wscValidateBtn" type="button" class="ctrl-btn primary" disabled onclick="validateWsc()">START WSC</button>
-        <p id="wscHint" class="panel-helper"></p>
-        <p id="wscCountdown" class="panel-helper"></p>
-        <p id="wscBalance" class="panel-helper" role="status" hidden></p>
-        <p class="panel-helper">Checks the configured wallet's SOL balance against this quote. Validation only; no funds are transferred.</p>
-        <p id="wscStatus" class="form-status" role="status"></p>
-      </div>
-    </div>
-  </div>
-
-  <div class="panel client-notes-panel" id="withdrawalPanel">
-    <div class="panel-head"><span class="panel-title">Withdrawable Balance</span></div>
-    <div id="withdrawableAmount" style="font-size:28px;color:var(--cyan);margin-bottom:12px;">Loading…</div>
-    <form id="withdrawableAdminForm" class="client-wallet-form" style="display:none;max-width:360px;" onsubmit="saveWithdrawableBalance(event)">
-      <label for="withdrawableInput">Set balance (USD)</label>
-      <input id="withdrawableInput" type="number" min="0" max="999999999999.99" step="0.01" required placeholder="0.00">
-      <button class="ctrl-btn primary" type="submit">Save balance</button>
-    </form>
-    <button id="requestWithdrawalBtn" type="button" class="ctrl-btn primary" style="display:none;" onclick="requestWithdrawal()">Request withdrawal</button>
-    <p id="withdrawalStatus" class="form-status" role="status"></p>
-    <p class="panel-helper">Approval records your request. Payment is handled separately by the admin.</p>
-    <div id="withdrawalHistory" class="client-note-list"></div>
-  </div>
-
-  <div class="panel client-notes-panel">
-    <span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span>
-    <div class="panel-head">
-      <span class="panel-title">Client Notes</span>
-      <button type="button" class="ctrl-btn" id="addClientNoteBtn" style="display:none;" onclick="startClientNote()">Add note</button>
-    </div>
-    <div class="client-note-editor" id="clientNoteEditor" style="display:none;">
-      <label for="clientNoteTitle">Header</label>
-      <input id="clientNoteTitle" type="text" maxlength="120" placeholder="Note header">
-      <label for="clientNoteBody">Body</label>
-      <textarea id="clientNoteBody" maxlength="4000" rows="5" placeholder="Write a note for this client"></textarea>
-      <div class="client-note-actions">
-        <button type="button" class="ctrl-btn primary" id="saveClientNoteBtn" onclick="saveClientNote()">Save note</button>
-        <button type="button" class="ctrl-btn" onclick="cancelClientNote()">Cancel</button>
-      </div>
-    </div>
-    <div class="client-note-list" id="clientNoteList"><p class="panel-helper">Loading notes…</p></div>
+    </aside>
   </div>
 
   <!-- session info strip -->
