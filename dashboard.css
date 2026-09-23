@@ -550,3 +550,19 @@
   .compact-dashboard .panel::before,.compact-dashboard .ring-spin{ animation:none; }
 }
 
+
+
+/* Public Solana network telemetry, separate from client validation. */
+.compact-dashboard .solana-stats{ --card-violet:rgba(134,81,224,.2); --card-cyan:rgba(44,192,150,.1); }
+.network-chain{ font:8px 'JetBrains Mono',monospace; letter-spacing:.12em; color:var(--muted); margin-bottom:16px; }
+.network-state{ font-size:9px; color:var(--cyan); padding:4px 7px; border:1px solid var(--line); border-radius:20px; }
+.network-metrics{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; margin-bottom:14px; }
+.network-label{ display:block; font-size:10px; color:var(--muted); margin-bottom:6px; }
+.network-metrics strong{ display:block; font:500 25px 'Space Grotesk',sans-serif; letter-spacing:-.03em; color:#bbf2ee; overflow-wrap:anywhere; }
+.network-metrics>div+div{ border-left:1px solid var(--line-soft); padding-left:12px; }
+.network-detail{ font-size:10px; color:var(--muted); line-height:1.6; overflow-wrap:anywhere; }
+.network-method{ margin-top:12px; padding-top:12px; border-top:1px solid var(--line-soft); font-size:10px; color:var(--muted); }
+.network-method summary{ cursor:pointer; color:var(--cyan); }
+.network-method p{ margin-top:8px; line-height:1.6; }
+.solana-stats[data-state="unavailable"] .network-metrics strong{ color:var(--muted); }
+.solana-stats[data-state="unavailable"] .network-state,.solana-stats[data-state="partial"] .network-state{ color:var(--amber); }

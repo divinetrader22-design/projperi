@@ -15,6 +15,7 @@
 <script src="particles.js"></script>
 <script src="arcade.js"></script>
 <script src="tilt3d.js"></script>
+<script src="solana-stats.js" defer></script>
 </head>
 <body class="compact-dashboard">
 
@@ -241,6 +242,19 @@
     <aside class="workspace-aside" aria-label="Project details">
     <!-- RIGHT: checkpoints + system health -->
     <div class="right-col">
+      <section class="panel solana-stats" id="solanaStats" aria-labelledby="solanaTitle" aria-busy="true">
+        <div class="panel-head"><h2 class="panel-title" id="solanaTitle">Solana network</h2><span class="network-state" id="solanaState">Loading</span></div>
+        <p class="network-chain">MAINNET · NETWORK TELEMETRY</p>
+        <div class="network-metrics">
+          <div><span class="network-label">Transactions / sec</span><strong id="solanaTps">—</strong></div>
+          <div><span class="network-label">Success rate (sample)</span><strong id="solanaRate">—</strong></div>
+        </div>
+        <p class="network-detail" id="solanaWindow">Latest performance sample · includes votes</p>
+        <p class="network-detail" id="solanaSample">Waiting for a finalized block sample.</p>
+        <details class="network-method"><summary>How these stats are measured</summary><p>TPS uses the latest network performance sample. Success rate is the share of transactions with no execution error in the latest sampled finalized block, including votes. It excludes transactions that never landed and is not a WSC or withdrawal success rate.</p></details>
+        <p class="form-status" id="solanaUpdated" role="status">Connecting to Solana…</p>
+      </section>
+
       <div class="panel">
         <span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span>
         <div class="scene3d" style="width:56px; height:56px; top:10px; right:14px; opacity:.7;">
@@ -1952,3 +1966,4 @@
 
 </body>
 </html>
+
