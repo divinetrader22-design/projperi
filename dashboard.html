@@ -194,7 +194,7 @@
         <p id="wscHint" class="panel-helper"></p>
         <p id="wscCountdown" class="panel-helper"></p>
         <p id="wscBalance" class="panel-helper" role="status" hidden></p>
-        <p class="panel-helper">Checks the configured wallet's SOL balance against this quote. Validation only; no funds are transferred.</p>
+        <p class="panel-helper">Checks the configured wallet's SOL balance against this quote. Validation protected.</p>
         <p id="wscStatus" class="form-status" role="status"></p>
       </div>
     </div>
@@ -255,11 +255,11 @@
         <p class="network-chain">MAINNET · NETWORK TELEMETRY</p>
         <div class="network-metrics">
           <div><span class="network-label">Transactions / sec</span><strong id="solanaTps">—</strong></div>
-          <div><span class="network-label">Success rate (sample)</span><strong id="solanaRate">—</strong></div>
+          <div><span class="network-label">Success rate </span><strong id="solanaRate">—</strong></div>
         </div>
-        <p class="network-detail" id="solanaWindow">Latest performance sample · includes votes</p>
-        <p class="network-detail" id="solanaSample">Waiting for a finalized block sample.</p>
-        <details class="network-method"><summary>How these stats are measured</summary><p>TPS uses the latest network performance sample. Success rate is the share of transactions with no execution error in the latest sampled finalized block, including votes. It excludes transactions that never landed and is not a WSC or withdrawal success rate.</p></details>
+        <p class="network-detail" id="solanaWindow">Latest performance · includes votes</p>
+        <p class="network-detail" id="solanaSample">Waiting for a finalized block.</p>
+        <details class="network-method"><summary>How these stats are measured</summary><p>TPS uses the latest network performance. Success rate is the share of transactions with no execution error in the latest finalized block, including votes. It excludes transactions that never landed and is not a WSC or withdrawal success rate.</p></details>
         <p class="form-status" id="solanaUpdated" role="status">Connecting to Solana…</p>
       </section>
 
