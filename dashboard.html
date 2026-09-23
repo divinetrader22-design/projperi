@@ -172,6 +172,14 @@
       <form id="quoteAdminForm" class="client-wallet-form" style="display:none;max-width:520px;" onsubmit="saveClientQuote(event)">
         <label for="quoteSolInput">Quote amount (SOL)</label>
         <input id="quoteSolInput" type="text" inputmode="decimal" maxlength="19" required placeholder="0.00">
+        <label for="quoteTiming">Apply quote</label>
+        <select id="quoteTiming" onchange="updateQuoteControls()"><option value="now">Immediately</option><option value="later">At a scheduled time</option></select>
+        <label for="quoteScheduledAt" id="quoteTimeLabel" hidden>Date and time</label>
+        <input id="quoteScheduledAt" type="datetime-local" hidden>
+        <p id="quoteTimezone" class="panel-helper" hidden></p>
+        <p class="panel-helper">Saving replaces any pending quote change for this client.</p>
+        <button id="quoteCancelSchedule" type="button" class="ctrl-btn" hidden onclick="cancelQuoteSchedule()">Cancel scheduled change</button>
+        <p id="quoteScheduleStatus" class="panel-helper"></p>
         <button id="quoteSave" type="submit" class="ctrl-btn primary" disabled>Save quote</button>
       </form>
       <div id="quoteClientControls" style="display:none;">
@@ -923,6 +931,7 @@
   }
 
   let quoteBusy = false, quoteAdminLoaded = false, quoteVersion = 0;
+  let quotePollTimer = null, quotePollBusy = false, adminScheduledQuote = null;
   let currentSolQuote = null, wscBusy = false, wscVersion = 0;
   let wscCooldownUntil = 0, wscCooldownTimer = null, wscCooldownKey = '';
 
@@ -969,6 +978,17 @@
       ? 'Get your available quote.' : 'Save your FWP-Key to enable Get quote.';
     document.getElementById('quoteSave').disabled = !quoteAdminLoaded || quoteBusy || !project?.client_id;
     document.getElementById('quoteSolInput').disabled = !quoteAdminLoaded || quoteBusy || !project?.client_id;
+    const scheduled = document.getElementById('quoteTiming').value === 'later';
+    document.getElementById('quoteTiming').disabled = !quoteAdminLoaded || quoteBusy;
+    document.getElementById('quoteScheduledAt').hidden = !scheduled;
+    document.getElementById('quoteScheduledAt').required = scheduled;
+    document.getElementById('quoteScheduledAt').disabled = !scheduled || quoteBusy;
+    document.getElementById('quoteTimeLabel').hidden = !scheduled;
+    document.getElementById('quoteTimezone').hidden = !scheduled;
+    document.getElementById('quoteTimezone').textContent = 'Time zone: ' + Intl.DateTimeFormat().resolvedOptions().timeZone;
+    document.getElementById('quoteSave').textContent = scheduled ? 'Schedule quote' : 'Save quote';
+    document.getElementById('quoteCancelSchedule').hidden = !adminScheduledQuote;
+    document.getElementById('quoteCancelSchedule').disabled = quoteBusy;
     document.getElementById('wscControls').style.display = client ? 'block' : 'none';
     const cooldown = wscSecondsRemaining();
     document.getElementById('wscValidateBtn').disabled = !client || !fwpKeyIsSet || fwpBusy || quoteBusy || wscBusy || cooldown > 0;
@@ -990,17 +1010,26 @@
     document.getElementById('quoteResult').hidden = true;
   }
 
+  function showAdminQuote(data){
+    adminScheduledQuote = data?.scheduled || null;
+    document.getElementById('quoteSolInput').value = data?.current?.required_sol || '';
+    document.getElementById('quoteTiming').value = 'now';
+    document.getElementById('quoteScheduledAt').value = '';
+    document.getElementById('quoteScheduleStatus').textContent = adminScheduledQuote
+      ? 'Scheduled: ' + adminScheduledQuote.required_sol + ' SOL on ' + new Date(adminScheduledQuote.effective_at).toLocaleString([], {hour12:true})
+      : 'No pending quote change.';
+    quoteAdminLoaded = true;
+  }
+
   async function loadAdminQuote(){
     updateQuoteControls();
     if (currentRole !== 'admin' || !project?.client_id) return;
     const clientId = project.client_id;
     try {
-      const { data, error } = await supabaseClient.from('client_quotes').select('body,required_sol')
-        .eq('project_id', project.id).eq('client_id', clientId).maybeSingle();
+      const { data, error } = await supabaseClient.rpc('admin_client_quote', {p_project_id:project.id,p_client_id:clientId});
       if (project.client_id !== clientId) return;
       if (error) throw error;
-      document.getElementById('quoteSolInput').value = data?.required_sol || '';
-      quoteAdminLoaded = true;
+      showAdminQuote(data);
     } catch {
       document.getElementById('quoteStatus').textContent = 'Could not load the quote. Refresh the page to retry.';
     } finally { updateQuoteControls(); }
@@ -1014,17 +1043,81 @@
       document.getElementById('quoteStatus').textContent = 'Enter a positive SOL amount with up to 9 decimal places.';
       return;
     }
+    const scheduled = document.getElementById('quoteTiming').value === 'later';
+    const localTime = document.getElementById('quoteScheduledAt').value;
+    const effectiveAt = scheduled ? new Date(localTime) : null;
+    if (scheduled && (!localTime || !Number.isFinite(effectiveAt.getTime()) || effectiveAt.getTime() <= Date.now())) {
+      document.getElementById('quoteStatus').textContent = 'Choose a future date and time.';
+      return;
+    }
+    const clientId = project.client_id;
     quoteBusy = true;
     updateQuoteControls();
     try {
-      const { data, error } = await supabaseClient.from('client_quotes').upsert({
-        project_id: project.id, client_id: project.client_id, body: requiredSol + ' SOL', required_sol: requiredSol, updated_at: new Date().toISOString()
-      }, { onConflict: 'project_id,client_id' }).select('project_id').single();
+      const { data, error } = await supabaseClient.rpc('admin_client_quote', {
+        p_project_id:project.id,p_client_id:clientId,p_action:scheduled?'schedule':'save',
+        p_required_sol:requiredSol,p_effective_at:effectiveAt?.toISOString() || null
+      });
+      if (project.client_id !== clientId) return;
       if (error || !data) throw new Error('Save failed');
-      document.getElementById('quoteStatus').textContent = 'Quote saved.';
+      showAdminQuote(data);
+      document.getElementById('quoteStatus').textContent = scheduled ? 'Quote change scheduled.' : 'Quote saved.';
     } catch {
-      document.getElementById('quoteStatus').textContent = 'Could not save the quote. Please try again.';
+      document.getElementById('quoteStatus').textContent = 'Could not save. Check the amount and future time, then try again.';
     } finally { quoteBusy = false; updateQuoteControls(); }
+  }
+
+  async function cancelQuoteSchedule(){
+    if (currentRole !== 'admin' || !project?.client_id || quoteBusy || !adminScheduledQuote) return;
+    const clientId = project.client_id;
+    quoteBusy = true; updateQuoteControls();
+    try {
+      const {data,error} = await supabaseClient.rpc('admin_client_quote',{p_project_id:project.id,p_client_id:clientId,p_action:'cancel'});
+      if (project.client_id !== clientId) return;
+      if (error) throw error;
+      showAdminQuote(data);
+      document.getElementById('quoteStatus').textContent = 'Pending schedule cleared. Any quote already in effect is retained.';
+    } catch { document.getElementById('quoteStatus').textContent = 'Could not cancel the schedule. Please try again.'; }
+    finally { quoteBusy = false; updateQuoteControls(); }
+  }
+
+  function displayClientQuote(data){
+    const changed = currentSolQuote?.updated_at !== data?.updated_at || currentSolQuote?.required_sol !== data?.required_sol;
+    if (changed) clearClientQuote();
+    currentSolQuote = data || null;
+    const time = data?.updated_at ? new Date(data.updated_at) : null;
+    document.getElementById('quoteStatus').textContent = time && Number.isFinite(time.getTime())
+      ? 'Quote updated ' + time.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',hour12:true})
+      : (data ? 'Your quote' : 'No quote is available yet. Please check again later.');
+    document.getElementById('quoteStatus').title = time && Number.isFinite(time.getTime()) ? time.toLocaleString([], {hour12:true}) : '';
+    document.getElementById('quoteResult').textContent = data?.required_sol ? data.required_sol + ' SOL' : (data?.body || '');
+    document.getElementById('quoteResult').hidden = !data;
+    document.getElementById('wscRequired').textContent = data?.required_sol ? 'Required SOL: ' + data.required_sol : '';
+    updateQuoteControls();
+  }
+
+  async function refreshScheduledQuote(){
+    if (document.hidden || currentRole !== 'client' || !project || !fwpKeyIsSet || fwpBusy || quoteBusy || quotePollBusy || wscBusy) return;
+    const version = quoteVersion;
+    quotePollBusy = true;
+    try {
+      const {data,error} = await supabaseClient.rpc('get_client_quote',{p_project_id:project.id}).abortSignal(AbortSignal.timeout(10000));
+      if (version !== quoteVersion || quoteBusy || wscBusy) return;
+      if (error) {
+        if (error.code === '42501') { clearClientQuote(); await loadFwpStatus(); }
+        throw new Error('Refresh failed');
+      }
+      displayClientQuote(data);
+    } catch {
+      if (version === quoteVersion) document.getElementById('quoteStatus').textContent = 'Quote refresh unavailable. Get the latest quote before continuing.';
+    } finally { quotePollBusy = false; }
+  }
+
+  function startQuotePolling(){
+    if (quotePollTimer) return;
+    quotePollTimer = setInterval(refreshScheduledQuote,15000);
+    document.addEventListener('visibilitychange',refreshScheduledQuote);
+    refreshScheduledQuote();
   }
 
   async function getClientQuote(){
@@ -1041,13 +1134,8 @@
         if (error.code === '42501') await loadFwpStatus();
         throw new Error('Quote unavailable');
       }
-      document.getElementById('quoteStatus').textContent = data ? 'Your quote' : 'No quote is available yet. Please check again later.';
-      document.getElementById('quoteResult').textContent = data?.required_sol ? data.required_sol + ' SOL' : (data?.body || '');
-      document.getElementById('quoteResult').hidden = !data;
-      currentSolQuote = data || null;
-      document.getElementById('wscRequired').textContent = data?.required_sol
-        ? 'Required SOL: ' + data.required_sol
-        : (data ? 'SOL validation is unavailable until a required SOL amount is added to your quote.' : '');
+      displayClientQuote(data);
+      startQuotePolling();
     } catch {
       document.getElementById('quoteStatus').textContent = 'Could not get your quote. Check your key status and try again.';
     } finally { quoteBusy = false; updateQuoteControls(); }
@@ -1853,6 +1941,7 @@
           project = payload.new; render(project.progress); renderWallet();
           if (clientChanged) {
             quoteAdminLoaded = false;
+            adminScheduledQuote = null;
             document.getElementById('quoteSolInput').value = '';
             document.getElementById('quoteStatus').textContent = '';
             fwpKeyIsSet = false;
@@ -1966,4 +2055,5 @@
 
 </body>
 </html>
+
 
