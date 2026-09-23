@@ -1,0 +1,37 @@
+begin;
+do $$
+declare a uuid; c uuid; p uuid:=gen_random_uuid(); q jsonb; due timestamptz:=clock_timestamp()-interval '1 minute';
+begin
+ select id into a from public.profiles where role='admin' limit 1;
+ select id into c from public.profiles where role='client' limit 1;
+ if a is null or c is null then raise exception 'Missing test roles'; end if;
+ insert into public.projects(id,ref,client_name,client_id) values(p,'QUOTE-ROLLBACK-TEST','Schedule test',c);
+ insert into public.client_fwp_keys(project_id,client_id,key_value) values(p,c,repeat('x',50));
+ perform set_config('request.jwt.claim.sub',a::text,true);
+ perform public.admin_client_quote(p,c,'save','0.100000001');
+ q:=public.admin_client_quote(p,c,'schedule','0.200000001',clock_timestamp()+interval '1 hour');
+ if q->'current'->>'required_sol'<>'0.100000001' or q->'scheduled'->>'required_sol'<>'0.200000001' then raise exception 'Schedule overwrote current'; end if;
+ perform set_config('request.jwt.claim.sub',c::text,true);
+ q:=public.get_client_quote(p);
+ if q->>'required_sol'<>'0.100000001' or q ? 'scheduled' then raise exception 'Future quote leaked'; end if;
+ begin perform public.admin_client_quote(p,c,'save','9'); raise exception 'Client write allowed'; exception when insufficient_privilege then null; end;
+ update public.client_quote_schedules set effective_at=due where project_id=p;
+ q:=public.get_client_quote(p);
+ if q->>'required_sol'<>'0.200000001' or (q->>'updated_at')::timestamptz<>due then raise exception 'Due quote not effective'; end if;
+ if exists(select 1 from public.client_quote_schedules where project_id=p) then raise exception 'Schedule not consumed'; end if;
+ perform set_config('request.jwt.claim.sub',a::text,true);
+ perform public.admin_client_quote(p,c,'schedule','0.3',clock_timestamp()+interval '1 hour');
+ perform public.admin_client_quote(p,c,'cancel');
+ if exists(select 1 from public.client_quote_schedules where project_id=p) then raise exception 'Cancellation failed'; end if;
+ perform public.admin_client_quote(p,c,'schedule','0.4',clock_timestamp()+interval '1 hour');
+ perform public.admin_client_quote(p,c,'save','0.5');
+ if exists(select 1 from public.client_quote_schedules where project_id=p) then raise exception 'Immediate save left pending schedule'; end if;
+ begin perform public.admin_client_quote(p,c,'schedule','1',due); raise exception 'Past time allowed'; exception when invalid_parameter_value then null; end;
+ begin perform public.admin_client_quote(p,c,'schedule','0',clock_timestamp()+interval '1 hour'); raise exception 'Zero quote allowed'; exception when invalid_parameter_value then null; end;
+ perform set_config('request.jwt.claim.sub',gen_random_uuid()::text,true);
+ begin perform public.get_client_quote(p); raise exception 'Unrelated read allowed'; exception when insufficient_privilege then null; end;
+ if has_table_privilege('authenticated','public.client_quote_schedules','SELECT,INSERT,UPDATE,DELETE') then raise exception 'Direct schedule access allowed'; end if;
+ if has_function_privilege('authenticated','public.apply_due_client_quote(uuid,uuid)','EXECUTE') then raise exception 'Internal helper exposed'; end if;
+end $$;
+select 'PASS: future, due, precision, cancellation, immediate save, invalid input and access controls' as result;
+rollback;
